@@ -31,7 +31,7 @@ def load_glove_matrix(w2i, glove_file):
     """
     Represent word embeddings in a matrix to initialize the nn's embeddings.
     """
-    f = open(glove_file, 'r')
+    f = open(glove_file, 'rb')
     vocab_size = len(w2i)
     embedding_dim = 50
     embeddings_matrix = np.zeros((vocab_size, embedding_dim))
@@ -134,15 +134,13 @@ EMBEDDING_DIM = len(embeddings_matrix[0, :])
 model = NPLM(CONTEXT_SIZE, VOCABULARY_DIM, EMBEDDING_DIM, embeddings_matrix)
 print("Initalized the Neural Probabilistic Language Model.")
 print(model)
-optimizer = optim.SGD(model.parameters(), lr=0.00001)
+optimizer = optim.Adam(params=model.parameters(), lr=1e-02)
 
 for i in range(ITER):
-    random.shuffle(train)
     train_loss = 0.0
     start = time.time()
 
     for j, (history, continuation) in enumerate(train):
-
         # forward pass
         optimizer.zero_grad()
         indices = encode_history(history, w2i)
@@ -161,3 +159,5 @@ for i in range(ITER):
         if j % 1000 == 0:
             _, _, acc = evaluate(model, train, w2i, i2w)
             print("Epoch {}, iter {}, train acc={}".format(i, j, acc))
+
+    print("loss: ", train_loss)
