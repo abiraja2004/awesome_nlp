@@ -5,6 +5,7 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 import numpy as np
 import nltk.corpus
 
@@ -12,7 +13,7 @@ import nltk.corpus
 CONTEXT_SIZE = 3
 VOCABULARY_DIM = 40000
 EMBEDDING_DIM = 50
-ITER = 10
+ITER = 100
 
 
 def get_w2i(corpus):
@@ -93,13 +94,11 @@ class NPLM(nn.Module):
         self.linear1 = nn.Linear(context * embed_dim, 100)
         self.tanh = nn.Tanh()
         self.linear2 = nn.Linear(100, vocab_dim)
-        self.softmax = nn.Softmax()
 
     def forward(self, inputs):
         embeds = self.embeddings(inputs).view((1, -1))
         out = self.tanh(self.linear1(embeds))
-        out = self.linear2(out)
-        return self.softmax(out)
+        return F.log_softmax(self.linear2(out))
 
 
 def to_ngrams(sentences, history_size):
@@ -119,7 +118,7 @@ sentences = [[word.lower() for word in s] for s in nltk.corpus.brown.sents()]
 i2w, w2i = get_w2i(words)
 print("Done reading data.")
 ngrams = to_ngrams(sentences, CONTEXT_SIZE)
-train = ngrams[:5000]
+train = ngrams[:50]
 test = ngrams[-1000:]
 print("Prepared n-grams for evaluation.")
 
@@ -134,7 +133,7 @@ EMBEDDING_DIM = len(embeddings_matrix[0, :])
 model = NPLM(CONTEXT_SIZE, VOCABULARY_DIM, EMBEDDING_DIM, embeddings_matrix)
 print("Initalized the Neural Probabilistic Language Model.")
 print(model)
-optimizer = optim.Adam(params=model.parameters(), lr=1e-02)
+optimizer = optim.SGD(params=model.parameters(), lr=1e-03, weight_decay=1e-5)
 
 for i in range(ITER):
     train_loss = 0.0
@@ -142,17 +141,19 @@ for i in range(ITER):
 
     for j, (history, continuation) in enumerate(train):
         # forward pass
-        optimizer.zero_grad()
+
         indices = encode_history(history, w2i)
         lookup_tensor = Variable(torch.LongTensor(indices))
-        scores = model(lookup_tensor)
+        scores = model.forward(lookup_tensor)
 
-        loss = nn.CrossEntropyLoss()
+        loss = nn.NLLLoss()
         target = Variable(torch.LongTensor([w2i[continuation]]))
         output = loss(scores, target)
         train_loss += output.data[0]
 
         # backward pass
+        optimizer.zero_grad()
+        model.zero_grad()
         output.backward()
         optimizer.step()
 
