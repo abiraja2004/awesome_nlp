@@ -1,5 +1,6 @@
 import torch.nn as nn
 from torch.autograd import Variable
+from RAN import RAN
 
 
 class RNNModel(nn.Module):
@@ -12,13 +13,17 @@ class RNNModel(nn.Module):
         if rnn_type in ['LSTM', 'GRU']:
             self.rnn = getattr(nn, rnn_type)(
                 ninp, nhid, nlayers, dropout=dropout)
+        elif rnn_type == 'RAN':
+            if nlayers > 1:
+                exit("Too many layers xd")
+            self.rnn = RAN(ninp, nhid, nlayers, dropout=dropout)
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh',
                                 'RNN_RELU': 'relu'}[rnn_type]
             except KeyError:
                 raise ValueError("""An invalid option for `--model` was supplied,
-                                 options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
+                                 options are ['LSTM', 'GRU', 'RAN', 'RNN_TANH' or 'RNN_RELU']""")
             self.rnn = nn.RNN(ninp, nhid, nlayers,
                               nonlinearity=nonlinearity, dropout=dropout)
         self.decoder = nn.Linear(nhid, ntoken)
