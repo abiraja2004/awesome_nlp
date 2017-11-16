@@ -12,7 +12,7 @@ class RAN(nn.Module):
         https://arxiv.org/pdf/1705.07393.pdf
     """
     def __init__(self, ninp, nhid, nlayers, dropout=0.5):
-        super(RAN, self).__init__()
+        super().__init__()
         self.ninp = ninp
         self.nhid = nhid
         self.nlayers = nlayers
@@ -24,15 +24,15 @@ class RAN(nn.Module):
         self.W_ix = nn.Parameter(torch.Tensor(nhid, ninp))  # input gate on input
         self.W_fh = nn.Parameter(torch.Tensor(nhid, nhid))  # forget gate on output
         self.W_fx = nn.Parameter(torch.Tensor(nhid, ninp))  # forget gate on input
-        # 5 biases
+        # 2 biases
         self.b_i = nn.Parameter(torch.Tensor(nhid))
         self.b_f = nn.Parameter(torch.Tensor(nhid))
 
         self.weights = [self.W_cx, self.W_ih, self.W_ix, self.W_fh, self.W_fx]
         self.biases = [self.b_i, self.b_f]
-        self.weight_init()
+        self.init_weights()
 
-    def weight_init(self):
+    def init_weights(self):
         for weight in self.weights:
             nn.init.uniform(weight)
         for bias in self.biases:
@@ -43,6 +43,15 @@ class RAN(nn.Module):
         func = StackedRNN(layer, self.nlayers, dropout=self.dropout)
         nexth, output = func(x, hidden, ((self.weights, self.biases), ))
         return output, nexth
+
+    def __repr__(self):
+        s = '{name}({ninp}, {nhid}'
+        if self.nlayers != 1:
+            s += ', num_layers={num_layers}'
+        if self.dropout != 0:
+            s += ', dropout={dropout}'
+        s += ')'
+        return s.format(name=self.__class__.__name__, **self.__dict__)
 
 
 def RANCell(x, hidden, weights, biases):

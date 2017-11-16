@@ -15,7 +15,7 @@ class RNNModel(nn.Module):
                 ninp, nhid, nlayers, dropout=dropout)
         elif rnn_type == 'RAN':
             if nlayers > 1:
-                exit("Too many layers xd")
+                exit("Too many layers")
             self.rnn = RAN(ninp, nhid, nlayers, dropout=dropout)
         else:
             try:
