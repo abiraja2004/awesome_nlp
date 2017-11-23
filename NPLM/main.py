@@ -1,13 +1,12 @@
-import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 from random import shuffle
+import logging
 
 # Import objects and functions customized for the abstractive summarization
 from NPLM import NPLM_Summarizer
-from Encoder import BOW_Encoder
 from Decoder import Greedy_Decoder
 from data import Collection
 from utils import load_glove_matrix, to_indices, collection_to_pairs, flatten
@@ -15,7 +14,7 @@ from utils import load_glove_matrix, to_indices, collection_to_pairs, flatten
 
 def evaluate(model, pairs, w2i, i2w):
     """
-    Evaluate a model on a data set.
+    Evaluate a model by generating
     """
     correct = 0
 
@@ -32,6 +31,8 @@ def evaluate(model, pairs, w2i, i2w):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
     # Load data
     corpus = Collection("../opinosis/topics/", "../opinosis/summaries-gold/")
     w2i = corpus.dictionary.word2idx
@@ -42,7 +43,9 @@ if __name__ == "__main__":
     train = collection_to_pairs(
         corpus.documents[:3], corpus.summaries[:3], w2i, context_size
     )
+    logging.info("Loaded data.")
     embed = load_glove_matrix(w2i, "../glove.6B/glove.6B.300d.txt")
+    logging.info("Initialized word embeddings with Glove.")
 
     # Sizes need for model and training
     embedding_dim = len(embed[0, :])
@@ -53,6 +56,7 @@ if __name__ == "__main__":
     opt = optim.Adam(params=model.parameters(), lr=0.001, weight_decay=1e-5)
     loss = nn.NLLLoss()
     decoder = Greedy_Decoder(w2i, i2w, context_size)
+    logging.info("Initialized neural model and decoder.")
 
     for i in range(200):
         shuffle(train)

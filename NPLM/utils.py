@@ -54,7 +54,6 @@ def to_pairs(document, summaries, size):
     sequence = [w for s in document.sentences for w in s]
     pairs = []
     for summary in summaries:
-        print(summary.name)
         summary = [w for s in summary.sentences for w in s]
         summary = ['<s>'] * (size - 1) + summary
         for i in range(size, len(summary)):

@@ -11,6 +11,8 @@ class Decoder(object):
 
 
 class Greedy_Decoder(Decoder):
+    """The Greedy Decoder simply selects the word with the highest probability
+    as the next word."""
     def __init__(self, w2i, i2w, context_size):
         super().__init__(w2i, i2w, context_size)
 
@@ -23,9 +25,9 @@ class Greedy_Decoder(Decoder):
         i = self.C
 
         while(summary.count('</s>') < 2 and i < 100):
-            summary_i = Variable(
-                torch.LongTensor(to_indices(summary[i - self.C:i], self.word2idx))
-            )
+            summary_i = Variable(torch.LongTensor(
+                to_indices(summary[i-self.C:i], self.word2idx)
+            ))
             scores = model.forward(sequence_i, summary_i)
             predict = scores.data.numpy().argmax(axis=1)[0]
             # print(scores, predict)

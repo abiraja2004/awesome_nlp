@@ -4,7 +4,8 @@ from collections import defaultdict
 
 
 class Dictionary(object):
-
+    """Object that creates and keeps word2idx and idx2word dicts.
+    Do not forget to call to_unk when the word2idx dict is filled."""
     def __init__(self):
         self.word2idx = defaultdict(lambda: len(self.word2idx))
         self.idx2word = dict()
@@ -24,7 +25,6 @@ class Dictionary(object):
 
 
 class Corpus(object):
-
     def __init__(self, path):
         self.train = Text(os.path.join(path, 'train.txt'))
         self.valid = Text(os.path.join(path, 'valid.txt'))
@@ -32,7 +32,6 @@ class Corpus(object):
 
 
 class Text(object):
-
     def __init__(self, text, from_file=True):
         self.name = text.split('/')[-1]
         self.dictionary = Dictionary()
@@ -68,7 +67,7 @@ class Text(object):
 
 
 class Collection(object):
-
+    """Collects documents and corresponding summaries."""
     def __init__(self, documents_path, summaries_path):
         self.documents_path = documents_path
         self.summaries_path = summaries_path
