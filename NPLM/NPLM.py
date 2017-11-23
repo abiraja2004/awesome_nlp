@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 from Encoder import BOW_Encoder, Attention_Based_Encoder
 
 
@@ -28,21 +27,27 @@ class NPLM(nn.Module):
 
 class NPLM_Summarizer(nn.Module):
     """
-    Neural Probabilistic Language Model, as described by Bengio (2003).
+    Neural Probabilistic Language Model for abstractive summarization,
+    as described by Rush (2015).
     """
-    def __init__(self, context, vocab_dim, embed_dim, hidden, pretrained=None):
+    def __init__(self, context, vocab_dim, embed_dim, hidden, enc, embed=None):
         super().__init__()
         self.embeddings = nn.Embedding(vocab_dim, embed_dim)
 
         # Use pretrained weights, a numpy matrix of shape vocab_dim x embed_dim
-        if pretrained is not None:
-            self.embeddings.weight.data.copy_(torch.from_numpy(pretrained))
+        if embed is not None:
+            self.embeddings.weight.data.copy_(torch.from_numpy(embed))
         self.U = nn.Linear(context * embed_dim, hidden)
         self.V = nn.Linear(hidden, vocab_dim)
         self.W = nn.Linear(embed_dim, vocab_dim)
-        # self.encoder = BOW_Encoder()
-        self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
-        self.P = nn.Parameter(torch.FloatTensor(torch.randn(embed_dim, context*embed_dim)))
+
+        if enc == "bow":
+            self.encoder = BOW_Encoder()
+        elif enc == "att":
+            self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
+
+        P = torch.FloatTensor(torch.randn(embed_dim, context*embed_dim))
+        self.P = nn.Parameter(P)
 
     def forward(self, x, y):
         # Use embeddings to represent input as matrices
