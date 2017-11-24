@@ -52,7 +52,7 @@ if __name__ == "__main__":
     vocab_dim = len(w2i)
 
     # Initalize the network
-    model = NPLM_Summarizer(context_size, vocab_dim, embedding_dim, 300, embed)
+    model = NPLM_Summarizer(context_size, vocab_dim, embedding_dim, 300, "att", embed)
     opt = optim.Adam(params=model.parameters(), lr=0.001, weight_decay=1e-5)
     loss = nn.NLLLoss()
     decoder = Greedy_Decoder(w2i, i2w, context_size)
