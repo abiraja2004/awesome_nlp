@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
 from Encoder import BOW_Encoder, Attention_Based_Encoder
 
 
@@ -44,10 +45,11 @@ class NPLM_Summarizer(nn.Module):
         if enc == "bow":
             self.encoder = BOW_Encoder()
         elif enc == "att":
+            P = torch.FloatTensor(torch.randn(embed_dim, context*embed_dim))
+            self.P = nn.Parameter(P)
             self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
 
-        P = torch.FloatTensor(torch.randn(embed_dim, context*embed_dim))
-        self.P = nn.Parameter(P)
+        logging.info("Feedforward neural language model initialized.")
 
     def forward(self, x, y):
         # Use embeddings to represent input as matrices
