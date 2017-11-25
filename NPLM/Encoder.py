@@ -3,12 +3,13 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import get_w2i, load_glove_matrix
+import logging
 
 
 class BOW_Encoder():
     """Simple Bag of Words encoder. Does not take into account word order."""
     def __init__(self):
-        print("BOW Encoder initialized.")
+        logging.info("BOW Encoder initialized.")
 
     def encode(self, embeds_x, embeds_y, M):
         p = Variable(torch.FloatTensor([1/M for i in range(M)]))
@@ -22,7 +23,7 @@ class Attention_Based_Encoder():
         self.Q = Q
         self.contex = context
         self.embed_dim = embed_dim
-        print("Attention Based Encoder initialized.")
+        logging.info("Attention Based Encoder initialized.")
 
     def encode(self, embeds_x, embeds_y, P, M):
         # x bar is a smoothed version of x tilde
