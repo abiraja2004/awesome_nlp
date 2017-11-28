@@ -27,5 +27,4 @@ def load_glove_matrix(w2i, glove_file):
         if not (False in [n == 0 for n in row]):
             vec = np.random.rand(1, embedding_dim)
             embeddings_matrix[i, :] = vec / np.linalg.norm(vec)
-    print(embeddings_matrix[w2i['australian'],:])
     return embeddings_matrix
