@@ -44,6 +44,7 @@ class Greedy_Decoder(Decoder):
         return(summary)
 
     def find_next_word(self, summary, i, model, sequence):
+        # Ensure that we do not predict unk
         summary_i = Variable(LT(summary[i-self.C:i]))
         scores = model.forward(sequence, summary_i, False)
         prob, index = torch.topk(scores.data, 2)
@@ -63,7 +64,7 @@ class Beam_Search_Decoder(Decoder):
         logging.info("Beam Search Decoder initialized.")
         self.verbose = verbose
 
-    def decode(self, sequence, model, len, sentences=False):
+    def decode(self, sequence, model, length, sentences=False):
         """Given a sequence and a model, generate a summary according to
         beam search."""
 
@@ -81,10 +82,11 @@ class Beam_Search_Decoder(Decoder):
                 self.print_hypothesis(hypothesis)
 
         # For every index in summary, reestimate top K best hypotheses
-        for i in range(self.C+1, len):
+        for i in range(self.C+1, length+self.C):
             # Gather beam_size * beam_size new hypotheses
             n_h = {}
-            for j in range(self.beam_size):
+            num_hypotheses = len(hypotheses)
+            for j in range(num_hypotheses):
                 hypothesis, prob = hypotheses[j]
                 y_c = hypothesis[i-self.C:i]
                 probs, indices = self.predict(model, sequence, y_c)
@@ -120,12 +122,20 @@ class Beam_Search_Decoder(Decoder):
         prob, index = torch.topk(scores.data, self.beam_size)
         return prob, index
 
-    def select_top(self, hypotheses, top):
-        print(hypotheses[key][0])
-        for key in hypotheses:
-            if self.idx2word(hypotheses[key][0][-1]) == "unk":
-                hypotheses.pop(key, None)
-        return sorted(hypotheses, key=lambda x: x[1], reverse=True)[:top]
+    def select_top(self, hypotheses, K):
+        # Ensure that we do not predict unk
+        to_delete = []
+        for i, h in enumerate(hypotheses):
+            if self.idx2word[h[0][-1]] == "unk":
+                to_delete.append(i)
+
+        # do not delete hypotheses if all predict unk
+        if len(hypotheses) != len(to_delete):
+            for index in to_delete:
+                hypotheses.pop(index)
+
+        # Select top K hypotheses with highest probs
+        return sorted(hypotheses, key=lambda x: x[1], reverse=True)[:K]
 
     def print_hypothesis(self, hypothesis):
         hypothesis, prob = hypothesis
