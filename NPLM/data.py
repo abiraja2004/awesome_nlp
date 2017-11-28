@@ -154,6 +154,7 @@ class Gigaword_Collection(object):
             logging.debug("Loading summaries, {} / {}.".format(i, total))
             summary = Text(summary, False, False)
             self.summaries[i] = summary
+            self.dictionary.add_text(summary.words)
 
         self.dictionary.to_unk()
         logging.info("Initialized corpus.")
