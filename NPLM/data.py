@@ -146,13 +146,13 @@ class Gigaword_Collection(object):
         total = len(self.documents)
         for i, document in enumerate(self.documents):
             logging.debug("Loading documents, {} / {}.".format(i, total))
-            document = Text(document, False, False)
+            document = Text(document, False, True)
             self.documents[i] = document
             self.dictionary.add_text(document.words)
 
         for i, summary in enumerate(self.summaries):
             logging.debug("Loading summaries, {} / {}.".format(i, total))
-            summary = Text(summary, False, False)
+            summary = Text(summary, False, True)
             self.summaries[i] = summary
             self.dictionary.add_text(summary.words)
 
