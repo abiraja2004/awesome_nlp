@@ -28,7 +28,7 @@ def evaluate(model, docs, pairs):
         if predict == int(continuation[0]):
             correct += 1
 
-    return correct, len(pairs), correct/len(pairs)
+    return correct, len(pairs), correct / len(pairs)
 
 
 def batchify(docs, pairs, batch_size):
@@ -42,7 +42,7 @@ def batchify(docs, pairs, batch_size):
     for length in set(lengths):
         pairs_with_length = [pair for pair in pairs if pair[1] == length]
         for i in range(batch_size, len(pairs_with_length), batch_size):
-            batches.append(pairs_with_length[i-batch_size:i])
+            batches.append(pairs_with_length[i - batch_size:i])
     return batches
 
 
@@ -62,7 +62,6 @@ def fill_batch(docs, batch):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         description='NPLM Language Model for abstractive summarization.')
     parser.add_argument('--documents', type=str, default='../opinosis/topics/',
