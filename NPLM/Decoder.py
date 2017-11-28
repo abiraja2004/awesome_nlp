@@ -36,11 +36,11 @@ class Greedy_Decoder(Decoder):
                 i += 1
         else:
             # Greedily select the word with the highest probability
-            for i in range(self.C, len+self.C):
+            for i in range(self.C, len+self.C-1):
                 summary = self. find_next_word(summary, i, model, sequence)
 
         # Indices to words
-        summary = [self.idx2word[w] for w in summary[self.C:]]
+        summary = [self.idx2word[w] for w in summary[self.C-1:]]
         return(summary)
 
     def find_next_word(self, summary, i, model, sequence):
@@ -82,7 +82,7 @@ class Beam_Search_Decoder(Decoder):
                 self.print_hypothesis(hypothesis)
 
         # For every index in summary, reestimate top K best hypotheses
-        for i in range(self.C+1, length+self.C):
+        for i in range(self.C+1, length+self.C-1):
             # Gather beam_size * beam_size new hypotheses
             n_h = {}
             num_hypotheses = len(hypotheses)
