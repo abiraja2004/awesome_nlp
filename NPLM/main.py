@@ -3,32 +3,62 @@ import argparse
 import logging
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
+from torch.autograd import Variable as Var
+from torch import LongTensor as LT
 from random import shuffle
 
 # Import objects and functions customized for the abstractive summarization
 from NPLM import NPLM_Summarizer
 from Decoder import Greedy_Decoder, Beam_Search_Decoder
-from data import Collection
-from utils import load_glove_matrix, to_indices, collection_to_pairs, flatten
+from data import Opinosis_Collection, Gigaword_Collection
+from utils import load_glove_matrix
+from collections import Counter
 
 
-def evaluate(model, pairs, w2i, i2w):
+def evaluate(model, docs, pairs):
     """
     Evaluate a model by generating
     """
     correct = 0
 
-    for sequence, summary, continuation in pairs:
-        sequence_i = Variable(torch.LongTensor(to_indices(sequence, w2i)))
-        summary_i = Variable(torch.LongTensor(to_indices(summary, w2i)))
-        scores = model.forward(sequence_i, summary_i)
+    for index, _, summary, continuation in pairs:
+        scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
         predict = scores.data.numpy().argmax(axis=1)[0]
 
-        if predict == w2i[continuation]:
+        if predict == int(continuation[0]):
             correct += 1
 
     return correct, len(pairs), correct/len(pairs)
+
+
+def batchify(docs, pairs, batch_size):
+    """
+    Separate training samples in sets of equal sequence length.
+    Do not "fill" the document (the sentence to summarize) yet,
+    to spare memory.
+    """
+    batches = []
+    lengths = [pair[1] for pair in pairs]
+    for length in set(lengths):
+        pairs_with_length = [pair for pair in pairs if pair[1] == length]
+        for i in range(batch_size, len(pairs_with_length), batch_size):
+            batches.append(pairs_with_length[i-batch_size:i])
+    return batches
+
+
+def fill_batch(docs, batch):
+    """
+    Turn data from training samples into a batch that can be read by the
+    neural network.
+    """
+    sequences = []
+    summaries = []
+    continuations = []
+    for index, _, summary, continuation in batch:
+        sequences.append(docs[index])
+        summaries.append(summary)
+        continuations.append(continuation)
+    return LT(sequences), LT(summaries), LT(continuations).squeeze(1)
 
 
 if __name__ == "__main__":
@@ -39,6 +69,8 @@ if __name__ == "__main__":
                         help='path to documents to summarize')
     parser.add_argument('--summaries', type=str, help='path to gold summaries',
                         default='../opinosis/summaries-gold')
+    parser.add_argument('--corpus', type=str, default='opi',
+                        help='corpus we\'re using: opi or gig')
     parser.add_argument('--emfile', default="../glove.6B/glove.6B.300d.txt",
                         type=str, help='word embeddings file')
     parser.add_argument('--nhid', type=int, default=200,
@@ -65,66 +97,77 @@ if __name__ == "__main__":
                         help='path for saving model')
     parser.add_argument('--verbose', type=bool, default=False,
                         help='verbose mode for beam search decoder')
+    parser.add_argument('--batch_mode', type=bool, default=True,
+                        help='use batches')
+    parser.add_argument('--nr_docs', type=int, default=1000,
+                        help='number of documents to use from training set')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
 
     # Load data
-    corpus = Collection("../opinosis/topics/", "../opinosis/summaries-gold/")
+    if args.corpus == 'opi':
+        corpus = Opinosis_Collection(args.documents, args.summaries)
+    else:
+        corpus = Gigaword_Collection(args.documents, args.summaries,
+                                     args.nr_docs)
+    docs, train = corpus.collection_to_pairs(args.context_size)
+    shuffle(train)
     w2i = corpus.dictionary.word2idx
     i2w = corpus.dictionary.idx2word
-
-    train = collection_to_pairs(
-        corpus.documents[:1], corpus.summaries[:1], w2i, args.context_size
-    )
-    # According to Jasper things mess up when you shuffle every epoch
-    shuffle(train)
+    batches = batchify(docs, train, args.batch_size)
     logging.info("Loaded data.")
+
     embed = load_glove_matrix(w2i, "../glove.6B/glove.6B.300d.txt")
     logging.info("Initialized word embeddings with Glove.")
 
     # Initalize the network
     model = NPLM_Summarizer(args.context_size, len(w2i), len(embed[0, :]),
                             args.nhid, args.encoder, embed)
-    opt = optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=1e-5)
-    loss = nn.NLLLoss()
+    parameters = filter(lambda p: p.requires_grad, model.parameters())
+    opt = optim.Adam(params=parameters, lr=args.lr, weight_decay=1e-5)
+    criterion = nn.NLLLoss()
     if args.decoder == "grd":
         decoder = Greedy_Decoder(w2i, i2w, args.context_size, args.length)
     else:
         decoder = Beam_Search_Decoder(w2i, i2w, args.context_size, args.length,
                                       args.beam_size, args.verbose)
 
+    # model.forward(Var(LT(docs[train[0][0]])), Var(LT(train[0][2])), False)
+    # exit()
     for i in range(args.epochs):
-        for j, (sequence, summary, continuation) in enumerate(train):
+        for j, batch in enumerate(batches):
             # Forward pass
-            sequence_i = Variable(torch.LongTensor(to_indices(sequence, w2i)))
-            summary_i = Variable(torch.LongTensor(to_indices(summary, w2i)))
-            scores = model.forward(sequence_i, summary_i)
+            sequences, summaries, continuations = fill_batch(docs, batch)
+
+            scores = model.forward(Var(sequences), Var(summaries), True)
+            logging.debug("Epoch {}, iter {}. Forward pass done.".format(i, j))
 
             # Calculate loss
-            target = Variable(torch.LongTensor([w2i[continuation]]))
-            output = loss(scores, target)
+            output = criterion(scores, Var(continuations))
+            logging.debug("Epoch {}, iter {}. Calculated loss.".format(i, j))
 
             # Backward pass
             opt.zero_grad()
             model.zero_grad()
             output.backward()
             opt.step()
+            logging.debug("Epoch {}, iter {}.Updated parameters.".format(i, j))
 
             # Output accuracy
             if j % 1000 == 0:
-                _, _, acc = evaluate(model, train, w2i, i2w)
+                _, _, acc = evaluate(model, docs, train[:100])
                 print("Epoch {}, iter {}, train acc={}".format(i, j, acc))
+        torch.save(model, args.save)
 
-        # Output predicted summaries to file
-        s = []
-        s.append("\n\nEpoch {}\n---------------".format(i))
-        for k, d in enumerate(corpus.documents[:3]):
-            summary = decoder.decode(torch.LongTensor(
-                to_indices(flatten(d.sentences), w2i)), model
-            )
-            s.append("\n{}".format(d.name))
-            s.append(" ".join(summary))
-        open("summaries.txt", 'a').write("\n".join(s))
-
-    torch.save(model, args.save)
+    logging.info("Finished training, new summaries are predicted.")
+    # Output predicted summaries to file
+    s = []
+    s.append("\n\nEpoch {}\n---------------".format(i))
+    for k in range(0, args.nr_docs):
+        doc = corpus.documents[k].text
+        gold_summary = corpus.summaries[k].text
+        summary = decoder.decode(doc, model, len(gold_summary), False)
+        s.append("predicted summary: " + " ".join(summary))
+        s.append("gold summary: " + " ".join(gold_summary) + "\n")
+    open("summaries.txt", 'a').write("\n".join(s))

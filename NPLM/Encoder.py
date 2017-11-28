@@ -2,8 +2,9 @@ import nltk
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
-from utils import get_w2i, load_glove_matrix
+from utils import load_glove_matrix
 import logging
+import numpy as np
 
 
 class BOW_Encoder():
@@ -27,24 +28,23 @@ class Attention_Based_Encoder():
 
     def encode(self, embeds_x, embeds_y, P, M):
         # x bar is a smoothed version of x tilde
-        x_bar = torch.FloatTensor(M, self.embed_dim)
+        x_dim = embeds_x.size()
+        x_bar = torch.FloatTensor(x_dim)
+
         for i in range(M):
-            start = max(i-self.Q, 0)
-            end = min(i+self.Q, M-1)
-            x_bar[i, :] = torch.sum(embeds_x.data[start:end, :], 0) / self.Q
+            s = max(i-self.Q, 0)
+            e = min(i+self.Q, M-1)
+
+            # batch mode
+            if len(x_dim) == 3:
+                x_bar[:, i, :] = torch.sum(embeds_x.data[:, s:e, :], 1) / self.Q
+            # regular mode
+            elif len(x_dim) == 2:
+                x_bar[i, :] = torch.sum(embeds_x.data[s:e, :], 0) / self.Q
         x_bar = Variable(x_bar)
 
-        p = embeds_x @ P @ embeds_y.t()
-        p = torch.unsqueeze(F.softmax(p.squeeze()), 0)
+        a = P @ embeds_y.t()
+        p = embeds_x @ a
+        p = F.softmax(p.t())
         enc = p @ x_bar
         return enc
-
-
-if __name__ == "__main__":
-    words = [word.lower() for word in nltk.corpus.treebank.words()]
-    i2w, w2i = get_w2i(words)
-    embeddings_matrix = load_glove_matrix(w2i, "../glove.6B/glove.6B.50d.txt")
-
-    bow_enc = BOW_Encoder(w2i, embeddings_matrix)
-    enc = bow_enc.encode(["What", "are", "you", "doing", "?"], [])
-    print(enc)

@@ -41,24 +41,37 @@ class NPLM_Summarizer(nn.Module):
         self.U = nn.Linear(context * embed_dim, hidden)
         self.V = nn.Linear(hidden, vocab_dim)
         self.W = nn.Linear(embed_dim, vocab_dim)
+        self.enc = enc
+        self.context = context
 
         if enc == "bow":
             self.encoder = BOW_Encoder()
-        elif enc == "att":
+        else:
             P = torch.FloatTensor(torch.randn(embed_dim, context*embed_dim))
             self.P = nn.Parameter(P)
             self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
 
         logging.info("Feedforward neural language model initialized.")
 
-    def forward(self, x, y):
+    def forward(self, x, y, batch_mode):
         # Use embeddings to represent input as matrices
         embeds_x = self.embeddings(x)
-        embeds_y = self.embeddings(y).view((1, -1))
+
+        if not batch_mode:
+            embeds_y = self.embeddings(y).view((1, -1))
+            M = len(x)
+        else:
+            batch_size, M, embed_dim = embeds_x.size()
+            embeds_y = self.embeddings(y)
+            embeds_y = embeds_y.view((batch_size, embed_dim*self.context))
 
         # Call encoder
-        enc = self.encoder.encode(embeds_x, embeds_y, self.P, len(x))
+        if self.enc == "bow":
+            enc = self.encoder.encode(embeds_x, embeds_y, M)
+        else:
+            enc = self.encoder.encode(embeds_x, embeds_y, self.P, M)
 
-        out = F.tanh(self.U(embeds_y))
-        final = torch.add(self.V(out), self.W(enc))
-        return F.log_softmax(final)
+        hidden = self.U(embeds_y)
+        hidden = F.tanh(hidden)
+        out = torch.add(self.V(hidden), self.W(enc))
+        return F.log_softmax(out)

@@ -1,7 +1,7 @@
 import torch
 import logging
 from torch.autograd import Variable
-from utils import to_indices
+from torch import LongTensor as LT
 
 
 class Decoder(object):
@@ -19,27 +19,39 @@ class Greedy_Decoder(Decoder):
         super().__init__(w2i, i2w, context_size, length)
         logging.info("Greedy Decoder initialized.")
 
-    def decode(self, sequence, model):
+    def decode(self, sequence, model, len, sentences=False):
         """Given a sequence and a model, generate a summary in a
         greedy manner."""
 
         # Initalize the sentence with enough starting tags
         summary = [self.word2idx['<s>']] * self.C
-        sequence_i = Variable(
-            torch.LongTensor(to_indices(sequence, self.word2idx))
-        )
+        sequence = Variable(LT([self.word2idx[w] for w in sequence]))
 
-        # Greedily select the word with the highest probability
-        for i in range(self.C, self.length):
-            summary_i = Variable(torch.LongTensor(summary[i-self.C:i]))
-            scores = model.forward(sequence_i, summary_i)
-            prob, index = torch.topk(scores.data, 1)
-            summary.append(index[0][0])
-            i += 1
+        if sentences:
+            i = 0
+            # Greedily select the word with the highest probability
+            end_tag = self.word2idx['</s>']
+            while summary.count(end_tag) < len and len(summary) < 100:
+                summary = self. find_next_word(summary, i, model, sequence)
+                i += 1
+        else:
+            # Greedily select the word with the highest probability
+            for i in range(self.C, len+self.C):
+                summary = self. find_next_word(summary, i, model, sequence)
 
         # Indices to words
-        summary = [self.idx2word[w] for w in summary[self.C - 1:]]
+        summary = [self.idx2word[w] for w in summary[self.C:]]
         return(summary)
+
+    def find_next_word(self, summary, i, model, sequence):
+        summary_i = Variable(LT(summary[i-self.C:i]))
+        scores = model.forward(sequence, summary_i, False)
+        prob, index = torch.topk(scores.data, 2)
+        if self.idx2word[index[0][0]] == "unk":
+            summary.append(index[0][1])
+        else:
+            summary.append(index[0][0])
+        return summary
 
 
 class Beam_Search_Decoder(Decoder):
@@ -51,13 +63,13 @@ class Beam_Search_Decoder(Decoder):
         logging.info("Beam Search Decoder initialized.")
         self.verbose = verbose
 
-    def decode(self, sequence, model):
+    def decode(self, sequence, model, len, sentences=False):
         """Given a sequence and a model, generate a summary according to
         beam search."""
 
         # Initalize the summary with enough starting tags
         summary = [self.word2idx['<s>']] * self.C
-        sequence = Variable(sequence)
+        sequence = Variable(LT([self.word2idx[w] for w in sequence]))
 
         # Initialize hypotheses with three most probable words after start tags
         probs, indices = self.predict(model, sequence, summary[:self.C])
@@ -69,7 +81,7 @@ class Beam_Search_Decoder(Decoder):
                 self.print_hypothesis(hypothesis)
 
         # For every index in summary, reestimate top K best hypotheses
-        for i in range(self.C+1, self.length):
+        for i in range(self.C+1, len):
             # Gather beam_size * beam_size new hypotheses
             n_h = {}
             for j in range(self.beam_size):
@@ -104,12 +116,16 @@ class Beam_Search_Decoder(Decoder):
 
     def predict(self, model, sequence, summary):
         summary_i = Variable(torch.LongTensor(summary))
-        scores = model.forward(sequence, summary_i)
+        scores = model.forward(sequence, summary_i, False)
         prob, index = torch.topk(scores.data, self.beam_size)
         return prob, index
 
-    def select_top(self, list, top):
-        return sorted(list, key=lambda x: x[1], reverse=True)[:top]
+    def select_top(self, hypotheses, top):
+        print(hypotheses[key][0])
+        for key in hypotheses:
+            if self.idx2word(hypotheses[key][0][-1]) == "unk":
+                hypotheses.pop(key, None)
+        return sorted(hypotheses, key=lambda x: x[1], reverse=True)[:top]
 
     def print_hypothesis(self, hypothesis):
         hypothesis, prob = hypothesis
