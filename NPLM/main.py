@@ -97,8 +97,8 @@ if __name__ == "__main__":
                         help='path for saving model')
     parser.add_argument('--verbose', type=bool, default=False,
                         help='verbose mode for beam search decoder')
-    parser.add_argument('--batch_mode', type=bool, default=True,
-                        help='use batches')
+    parser.add_argument('--save_summaries', type=str, default='summaries.txt',
+                        help='file in which to save predicted summaries')
     parser.add_argument('--nr_docs', type=int, default=1000,
                         help='number of documents to use from training set')
     args = parser.parse_args()
@@ -170,4 +170,4 @@ if __name__ == "__main__":
         summary = decoder.decode(doc, model, len(gold_summary), False)
         s.append("predicted summary: " + " ".join(summary))
         s.append("gold summary: " + " ".join(gold_summary) + "\n")
-    open("summaries.txt", 'a').write("\n".join(s))
+    open(args.save_summaries, 'a').write("\n".join(s))
