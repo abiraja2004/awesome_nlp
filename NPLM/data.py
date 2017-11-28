@@ -6,8 +6,10 @@ from collections import defaultdict
 
 
 class Dictionary(object):
-    """Object that creates and keeps word2idx and idx2word dicts.
-    Do not forget to call to_unk when the word2idx dict is filled."""
+    """
+    Object that creates and keeps word2idx and idx2word dicts.
+    Do not forget to call to_unk when the word2idx dict is filled.
+    """
     def __init__(self):
         self.word2idx = defaultdict(lambda: len(self.word2idx))
         self.idx2word = dict()
@@ -85,7 +87,9 @@ class Text(object):
 
 
 class Opinosis_Collection(object):
-    """Collects documents and corresponding summaries."""
+    """
+    Collects documents and corresponding summaries.
+    """
     def __init__(self, documents_path, summaries_path):
         self.documents_path = documents_path
         self.summaries_path = summaries_path
@@ -102,7 +106,8 @@ class Opinosis_Collection(object):
         for folder in os.listdir(summaries_path):
             summaries = []
             for file in os.listdir(os.path.join(summaries_path, folder)):
-                summary = Text(os.path.join(summaries_path, folder, file), True)
+                summary = Text(os.path.join(
+                    summaries_path, folder, file), True)
                 summaries.append(summary)
             self.summaries.append(summaries)
 
@@ -123,7 +128,7 @@ class Opinosis_Collection(object):
             summary = [w for w in summary.text]
             summary = self.to_indices(['<s>'] * (size - 1) + summary)
             for i in range(size, len(summary)):
-                pairs.append((sequence, summary[i-size:i], LT([summary[i]])))
+                pairs.append((sequence, summary[i - size:i], LT([summary[i]])))
         return pairs
 
     def to_indices(self, sequence):
@@ -134,7 +139,9 @@ class Opinosis_Collection(object):
 
 
 class Gigaword_Collection(object):
-    """Collects documents and corresponding summaries."""
+    """
+    Collects documents and corresponding summaries.
+    """
     def __init__(self, documents_file, summaries_file, nr_docs):
         self.documents_path = documents_file
         self.summaries_path = summaries_file
@@ -184,7 +191,8 @@ class Gigaword_Collection(object):
         summary = self.to_indices(['<s>'] * (size - 1) + summary.text)
         pairs = []
         for i in range(size, len(summary)):
-            pairs.append((doc_id, doc_length, summary[i-size:i], [summary[i]]))
+            pairs.append((doc_id, doc_length, summary[
+                         i - size:i], [summary[i]]))
         return pairs
 
     def to_indices(self, sequence):

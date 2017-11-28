@@ -13,7 +13,7 @@ class BOW_Encoder():
         logging.info("BOW Encoder initialized.")
 
     def encode(self, embeds_x, embeds_y, M):
-        p = Variable(torch.FloatTensor([1/M for i in range(M)]))
+        p = Variable(torch.FloatTensor([1 / M for i in range(M)]))
         enc = torch.matmul(p, embeds_x)
         return enc
 
@@ -32,12 +32,13 @@ class Attention_Based_Encoder():
         x_bar = torch.FloatTensor(x_dim)
 
         for i in range(M):
-            s = max(i-self.Q, 0)
-            e = min(i+self.Q, M-1)
+            s = max(i - self.Q, 0)
+            e = min(i + self.Q, M - 1)
 
             # batch mode
             if len(x_dim) == 3:
-                x_bar[:, i, :] = torch.sum(embeds_x.data[:, s:e, :], 1) / self.Q
+                x_bar[:, i, :] = torch.sum(
+                    embeds_x.data[:, s:e, :], 1) / self.Q
             # regular mode
             elif len(x_dim) == 2:
                 x_bar[i, :] = torch.sum(embeds_x.data[s:e, :], 0) / self.Q
