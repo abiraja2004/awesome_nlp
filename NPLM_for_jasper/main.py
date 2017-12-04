@@ -27,7 +27,7 @@ def evaluate(model, docs, pairs, cuda_enabled):
             scores = model.forward(Var(LT(docs[index])).cuda(), Var(LT(summary)).cuda(), False)
         else:
             scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
-        predict = scores.data.numpy().argmax(axis=1)[0]
+        predict = scores.data.cpu().numpy().argmax(axis=1)[0]
 
         if predict == int(continuation[0]):
             correct += 1
