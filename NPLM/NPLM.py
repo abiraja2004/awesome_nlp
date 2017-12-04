@@ -47,7 +47,7 @@ class NPLM_Summarizer(nn.Module):
         if enc == "bow":
             self.encoder = BOW_Encoder()
         else:
-            P = torch.FloatTensor(torch.randn(embed_dim, context*embed_dim))
+            P = torch.FloatTensor(torch.randn(embed_dim, context * embed_dim))
             self.P = nn.Parameter(P)
             self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
 
@@ -63,7 +63,7 @@ class NPLM_Summarizer(nn.Module):
         else:
             batch_size, M, embed_dim = embeds_x.size()
             embeds_y = self.embeddings(y)
-            embeds_y = embeds_y.view((batch_size, embed_dim*self.context))
+            embeds_y = embeds_y.view((batch_size, embed_dim * self.context))
 
         # Call encoder
         if self.enc == "bow":

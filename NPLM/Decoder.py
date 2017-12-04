@@ -13,8 +13,10 @@ class Decoder(object):
 
 
 class Greedy_Decoder(Decoder):
-    """The Greedy Decoder simply selects the word with the highest probability
-    as the next word."""
+    """
+    The Greedy Decoder simply selects the word with the highest probability
+    as the next word.
+    """
     def __init__(self, w2i, i2w, context_size, length):
         super().__init__(w2i, i2w, context_size, length)
         logging.info("Greedy Decoder initialized.")
@@ -36,6 +38,7 @@ class Greedy_Decoder(Decoder):
                 i += 1
         else:
             # Greedily select the word with the highest probability
+
             for i in range(self.C, len+self.C-1):
                 summary = self. find_next_word(summary, i, model, sequence)
 
@@ -45,7 +48,7 @@ class Greedy_Decoder(Decoder):
 
     def find_next_word(self, summary, i, model, sequence):
         # Ensure that we do not predict unk
-        summary_i = Variable(LT(summary[i-self.C:i]))
+        summary_i = Variable(LT(summary[i - self.C:i]))
         scores = model.forward(sequence, summary_i, False)
         prob, index = torch.topk(scores.data, 2)
         if self.idx2word[index[0][0]] == "unk":
@@ -56,8 +59,10 @@ class Greedy_Decoder(Decoder):
 
 
 class Beam_Search_Decoder(Decoder):
-    """The Beam Search Decoder maintains K current best hypotheses at
-    a time."""
+    """
+    The Beam Search Decoder maintains K current best hypotheses at
+    a time.
+    """
     def __init__(self, w2i, i2w, context_size, length, beam_size, verbose=False):
         super().__init__(w2i, i2w, context_size, length)
         self.beam_size = beam_size
@@ -88,7 +93,7 @@ class Beam_Search_Decoder(Decoder):
             num_hypotheses = len(hypotheses)
             for j in range(num_hypotheses):
                 hypothesis, prob = hypotheses[j]
-                y_c = hypothesis[i-self.C:i]
+                y_c = hypothesis[i - self.C:i]
                 probs, indices = self.predict(model, sequence, y_c)
 
                 for k in range(self.beam_size):
@@ -97,7 +102,7 @@ class Beam_Search_Decoder(Decoder):
 
                     # Only keep the best hypothesis per continuation
                     if ((token not in n_h) or
-                       (token in n_h and new_prob > n_h[token][1])):
+                            (token in n_h and new_prob > n_h[token][1])):
                         n_h[token] = (hypothesis + [token], new_prob)
 
             # Select top K hypotheses from new_hypotheses

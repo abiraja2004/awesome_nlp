@@ -6,8 +6,10 @@ from collections import defaultdict
 
 
 class Dictionary(object):
-    """Object that creates and keeps word2idx and idx2word dicts.
-    Do not forget to call to_unk when the word2idx dict is filled."""
+    """
+    Object that creates and keeps word2idx and idx2word dicts.
+    Do not forget to call to_unk when the word2idx dict is filled.
+    """
     def __init__(self):
         self.word2idx = defaultdict(lambda: len(self.word2idx))
         self.idx2word = dict()
@@ -35,13 +37,12 @@ class Corpus(object):
 
 class Text(object):
     def __init__(self, text, from_file=True, end_tags=False):
-        self.dictionary = Dictionary()
         self.end_tags = end_tags
         if from_file:
-            self.sentences, self.words, self.text = self.from_file(text)
+            self.text = self.from_file(text)
             self.name = text.split('/')[-1]
         else:
-            self.sentences, self.words, self.text = self.from_var(text)
+            self.text = self.from_var(text)
 
     def from_file(self, path):
         """
@@ -53,9 +54,9 @@ class Text(object):
         with open(path, 'r', errors='ignore') as f:
             sentences = nltk.sent_tokenize(f.read())
         sentences = [nltk.word_tokenize(s) for s in sentences]
-        sentences, words = self.prepare(sentences)
-        text = [w for s in sentences for w in s]
-        return sentences, words, text
+        text = self.prepare(sentences)
+        sentences = []
+        return text
 
     def from_var(self, sentences):
         """
@@ -63,9 +64,9 @@ class Text(object):
         """
         sentences = nltk.sent_tokenize(sentences)
         sentences = [nltk.word_tokenize(s) for s in sentences]
-        sentences, words = self.prepare(sentences)
-        text = [w for s in sentences for w in s]
-        return sentences, words, text
+        text = self.prepare(sentences)
+        sentences = []
+        return text
 
     def prepare(self, sentences):
         """
@@ -80,12 +81,89 @@ class Text(object):
 
         # Add words to dictionary
         words = [word for s in sentences for word in s]
-        self.dictionary.add_text(words)
-        return sentences, words
+        sentences = []
+        return words
+
+
+class Gigaword_Collection(object):
+    """
+    Collects documents and corresponding summaries.
+    """
+    def __init__(self, documents_file, summaries_file, nr_docs):
+        if nr_docs == 0:
+            nr_docs = -1
+        self.documents_path = documents_file
+        self.summaries_path = summaries_file
+        self.documents = open(self.documents_path, 'r').readlines()[:nr_docs]
+        self.summaries = open(self.summaries_path, 'r').readlines()[:nr_docs]
+        self.dictionary = Dictionary()
+
+        # Extract all text and fill dicts
+        total = len(self.documents)
+        for i in range(total):
+            if i % 100000 == 0:
+                logging.debug("Loading documents, {} / {}.".format(i, total))
+            document = self.prepare(self.documents[i])
+            self.dictionary.add_text(set(document))
+
+        for i in range(total):
+            if i % 100000 == 0:
+                logging.debug("Loading summaries, {} / {}.".format(i, total))
+            summary = self.prepare(self.summaries[i])
+            self.dictionary.add_text(set(summary))
+
+        self.dictionary.to_unk()
+        logging.info("Initialized corpus.")
+
+    def collection_to_pairs(self, context):
+        """
+        Create training pairs for the entire collection.
+        """
+        self.pairs = []
+        docs = []
+        total = len(self.documents)
+        for i, document in enumerate(self.documents):
+            if i % 100000 == 0:
+                logging.debug("Preparing pairs for doc {} / {}.".format(i, total))
+            indices = self.to_indices(self.prepare(document))
+            docs.append(indices)
+            p = self.to_pairs(i, len(indices), self.prepare(self.summaries[i]), context)
+            self.pairs.extend(p)
+        logging.info("Initialized training pairs.")
+        return docs, self.pairs
+
+    def to_pairs(self, doc_id, doc_length, summary, size):
+        """
+        Create training pairs from a document.
+        Training pairs consist of (document id of artickle, length of original
+        article, context window of summary, correction continuation)
+        """
+        summary = self.to_indices(['<s>'] * (size - 1) + summary)
+        pairs = []
+        for i in range(size, len(summary)):
+            pairs.append((doc_id, doc_length, summary[
+                         i - size:i], [summary[i]]))
+        return pairs
+
+    def to_indices(self, sequence):
+        """
+        Represent a history of words as a list of indices.
+        """
+        return [self.dictionary.word2idx[w] for w in sequence]
+
+    def prepare(self, sentence):
+        """
+        Add start and end tags (end tags only if preferred).
+        Add words to the dictionary.
+        """
+        # Add start and end tags
+        return ['<s>'] +  nltk.word_tokenize(sentence) + ['/s']
 
 
 class Opinosis_Collection(object):
-    """Collects documents and corresponding summaries."""
+    """
+    Collects documents and corresponding summaries.
+    """
     def __init__(self, documents_path, summaries_path):
         self.documents_path = documents_path
         self.summaries_path = summaries_path
@@ -102,7 +180,8 @@ class Opinosis_Collection(object):
         for folder in os.listdir(summaries_path):
             summaries = []
             for file in os.listdir(os.path.join(summaries_path, folder)):
-                summary = Text(os.path.join(summaries_path, folder, file), True)
+                summary = Text(os.path.join(
+                    summaries_path, folder, file), True)
                 summaries.append(summary)
             self.summaries.append(summaries)
 
@@ -123,7 +202,7 @@ class Opinosis_Collection(object):
             summary = [w for w in summary.text]
             summary = self.to_indices(['<s>'] * (size - 1) + summary)
             for i in range(size, len(summary)):
-                pairs.append((sequence, summary[i-size:i], LT([summary[i]])))
+                pairs.append((sequence, summary[i - size:i], LT([summary[i]])))
         return pairs
 
     def to_indices(self, sequence):
@@ -131,64 +210,3 @@ class Opinosis_Collection(object):
         Represent a history of words as a list of indices.
         """
         return LT([self.dictionary.word2idx[w] for w in sequence])
-
-
-class Gigaword_Collection(object):
-    """Collects documents and corresponding summaries."""
-    def __init__(self, documents_file, summaries_file, nr_docs):
-        self.documents_path = documents_file
-        self.summaries_path = summaries_file
-        self.documents = open(self.documents_path, 'r').readlines()[:nr_docs]
-        self.summaries = open(self.summaries_path, 'r').readlines()[:nr_docs]
-        self.dictionary = Dictionary()
-
-        # Extract all text and fill dicts
-        total = len(self.documents)
-        for i, document in enumerate(self.documents):
-            logging.debug("Loading documents, {} / {}.".format(i, total))
-            document = Text(document, False, True)
-            self.documents[i] = document
-            self.dictionary.add_text(document.words)
-
-        for i, summary in enumerate(self.summaries):
-            logging.debug("Loading summaries, {} / {}.".format(i, total))
-            summary = Text(summary, False, True)
-            self.summaries[i] = summary
-            self.dictionary.add_text(summary.words)
-
-        self.dictionary.to_unk()
-        logging.info("Initialized corpus.")
-
-    def collection_to_pairs(self, context):
-        """
-        Create training pairs for the entire collection.
-        """
-        self.pairs = []
-        docs = []
-        total = len(self.documents)
-        for i, document in enumerate(self.documents):
-            logging.debug("Preparing pairs for doc {} / {}.".format(i, total))
-            indices = self.to_indices(document.text)
-            docs.append(indices)
-            p = self.to_pairs(i, len(indices), self.summaries[i], context)
-            self.pairs.extend(p)
-        logging.info("Initialized training pairs.")
-        return docs, self.pairs
-
-    def to_pairs(self, doc_id, doc_length, summary, size):
-        """
-        Create training pairs from a document.
-        Training pairs consist of (document id of artickle, length of original
-        article, context window of summary, correction continuation)
-        """
-        summary = self.to_indices(['<s>'] * (size - 1) + summary.text)
-        pairs = []
-        for i in range(size, len(summary)):
-            pairs.append((doc_id, doc_length, summary[i-size:i], [summary[i]]))
-        return pairs
-
-    def to_indices(self, sequence):
-        """
-        Represent a history of words as a list of indices.
-        """
-        return [self.dictionary.word2idx[w] for w in sequence]

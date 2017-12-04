@@ -2,6 +2,7 @@ import torch
 import argparse
 import logging
 import torch.nn as nn
+import pickle
 import torch.optim as optim
 from torch.autograd import Variable as Var
 from torch import LongTensor as LT
@@ -28,7 +29,7 @@ def evaluate(model, docs, pairs):
         if predict == int(continuation[0]):
             correct += 1
 
-    return correct, len(pairs), correct/len(pairs)
+    return correct, len(pairs), correct / len(pairs)
 
 
 def batchify(docs, pairs, batch_size):
@@ -42,7 +43,7 @@ def batchify(docs, pairs, batch_size):
     for length in set(lengths):
         pairs_with_length = [pair for pair in pairs if pair[1] == length]
         for i in range(batch_size, len(pairs_with_length), batch_size):
-            batches.append(pairs_with_length[i-batch_size:i])
+            batches.append(pairs_with_length[i - batch_size:i])
     return batches
 
 
@@ -62,15 +63,12 @@ def fill_batch(docs, batch):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         description='NPLM Language Model for abstractive summarization.')
     parser.add_argument('--documents', type=str, default='../opinosis/topics/',
                         help='path to documents to summarize')
     parser.add_argument('--summaries', type=str, help='path to gold summaries',
                         default='../opinosis/summaries-gold')
-    parser.add_argument('--corpus', type=str, default='opi',
-                        help='corpus we\'re using: opi or gig')
     parser.add_argument('--emfile', default="../glove.6B/glove.6B.300d.txt",
                         type=str, help='word embeddings file')
     parser.add_argument('--nhid', type=int, default=200,
@@ -99,22 +97,21 @@ if __name__ == "__main__":
                         help='verbose mode for beam search decoder')
     parser.add_argument('--save_summaries', type=str, default='summaries.txt',
                         help='file in which to save predicted summaries')
-    parser.add_argument('--nr_docs', type=int, default=1000,
+    parser.add_argument('--nr_docs', type=int, default=0,
                         help='number of documents to use from training set')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
 
     # Load data
-    if args.corpus == 'opi':
-        corpus = Opinosis_Collection(args.documents, args.summaries)
-    else:
-        corpus = Gigaword_Collection(args.documents, args.summaries,
-                                     args.nr_docs)
+    corpus = Gigaword_Collection(args.documents, args.summaries,
+                                 args.nr_docs)
     docs, train = corpus.collection_to_pairs(args.context_size)
     shuffle(train)
     w2i = corpus.dictionary.word2idx
     i2w = corpus.dictionary.idx2word
+    pickle.dump(list(w2i.items()), open("models/w2i.pickle", 'wb'))
+    pickle.dump(list(i2w.items()), open("models/i2w.pickle", 'wb'))
     batches = batchify(docs, train, args.batch_size)
     logging.info("Loaded data.")
 
@@ -133,12 +130,11 @@ if __name__ == "__main__":
         decoder = Beam_Search_Decoder(w2i, i2w, args.context_size, args.length,
                                       args.beam_size, args.verbose)
 
-    # model.forward(Var(LT(docs[train[0][0]])), Var(LT(train[0][2])), False)
-    # exit()
     for i in range(args.epochs):
         for j, batch in enumerate(batches):
             # Forward pass
-            sequences, summaries, continuations = fill_batch(docs, batch)
+            filled_batch = fill_batch(docs, batch)
+            sequences, summaries, continuations = filled_batch
 
             scores = model.forward(Var(sequences), Var(summaries), True)
             logging.debug("Epoch {}, iter {}. Forward pass done.".format(i, j))
@@ -155,19 +151,20 @@ if __name__ == "__main__":
             logging.debug("Epoch {}, iter {}.Updated parameters.".format(i, j))
 
             # Output accuracy
-            if j % 1000 == 0:
+            if j % 10000 == 0:
                 _, _, acc = evaluate(model, docs, train[:100])
                 print("Epoch {}, iter {}, train acc={}".format(i, j, acc))
-        torch.save(model, args.save)
+        torch.save(model, "models/epoch{}_".format(i) + args.save)
 
-    logging.info("Finished training, new summaries are predicted.")
-    # Output predicted summaries to file
-    s = []
-    s.append("\n\nEpoch {}\n---------------".format(i))
-    for k in range(0, args.nr_docs):
-        doc = corpus.documents[k].text
-        gold_summary = corpus.summaries[k].text
-        summary = decoder.decode(doc, model, len(gold_summary), False)
-        s.append("predicted summary: " + " ".join(summary))
-        s.append("gold summary: " + " ".join(gold_summary) + "\n")
-    open(args.save_summaries, 'a').write("\n".join(s))
+    logging.info("Finished training!")
+    # logging.info("Finished training, new summaries are predicted.")
+    # # Output predicted summaries to file
+    # s = []
+    # s.append("\n\nEpoch {}\n---------------".format(i))
+    # for k in range(0, args.nr_docs):
+    #     doc = corpus.documents[k].text
+    #     gold_summary = corpus.summaries[k]
+    #     summary = decoder.decode(doc, model, len(gold_summary), False)
+    #     s.append("predicted summary: " + " ".join(summary))
+    #     s.append("gold summary: " + " ".join(gold_summary) + "\n")
+    # open(args.save_summaries, 'a').write("\n".join(s))
