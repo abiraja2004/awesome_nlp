@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
     # Initalize the network
     model = NPLM_Summarizer(args.context_size, len(w2i), len(embed[0, :]),
-                            args.nhid, args.encoder, embed)
+                            args.nhid, args.encoder, embed, cuda=cuda_enabled)
     if cuda_enabled:
         model.cuda()
     parameters = filter(lambda p: p.requires_grad, model.parameters())
@@ -150,7 +150,10 @@ if __name__ == "__main__":
             logging.debug("Epoch {}, iter {}. Forward pass done.".format(i, j))
 
             # Calculate loss
-            output = criterion(scores, Var(continuations))
+            if cuda_enabled:
+                output = criterion(scores, Var(continuations).cuda())
+            else:
+                output = criterion(scores, Var(continuations))
             logging.debug("Epoch {}, iter {}. Calculated loss.".format(i, j))
 
             # Backward pass

@@ -31,8 +31,9 @@ class NPLM_Summarizer(nn.Module):
     Neural Probabilistic Language Model for abstractive summarization,
     as described by Rush (2015).
     """
-    def __init__(self, context, vocab_dim, embed_dim, hidden, enc, embed=None):
+    def __init__(self, context, vocab_dim, embed_dim, hidden, enc, embed=None, cuda=False):
         super().__init__()
+        self.cuda = cuda
         self.embeddings = nn.Embedding(vocab_dim, embed_dim)
 
         # Use pretrained weights, a numpy matrix of shape vocab_dim x embed_dim
@@ -45,11 +46,19 @@ class NPLM_Summarizer(nn.Module):
         self.context = context
 
         if enc == "bow":
-            self.encoder = BOW_Encoder()
+            if self.cuda:
+                self.encoder = BOW_Encoder(cuda=True)
+            else:
+                self.encoder = BOW_Encoder()
         else:
-            P = torch.FloatTensor(torch.randn(embed_dim, context * embed_dim))
-            self.P = nn.Parameter(P)
-            self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
+            if self.cuda:
+                P = torch.FloatTensor(torch.randn(embed_dim, context * embed_dim)).cuda()
+                self.P = nn.Parameter(P)
+                self.encoder = Attention_Based_Encoder(context, embed_dim, 2, cuda=True)
+            else:
+                P = torch.FloatTensor(torch.randn(embed_dim, context * embed_dim))
+                self.P = nn.Parameter(P)
+                self.encoder = Attention_Based_Encoder(context, embed_dim, 2)
 
         logging.info("Feedforward neural language model initialized.")
 
