@@ -115,7 +115,7 @@ if __name__ == "__main__":
     batches = batchify(docs, train, args.batch_size)
     logging.info("Loaded data.")
 
-    embed = load_glove_matrix(w2i, "../glove.6B/glove.6B.300d.txt")
+    embed = load_glove_matrix(w2i, "glove.6B.300d.txt")
     logging.info("Initialized word embeddings with Glove.")
 
     # Initalize the network
