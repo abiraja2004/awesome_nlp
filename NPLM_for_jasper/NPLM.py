@@ -33,8 +33,8 @@ class NPLM_Summarizer(nn.Module):
     """
     def __init__(self, context, vocab_dim, embed_dim, hidden, enc, embed=None, cuda=False):
         super().__init__()
-        self.cuda = cuda
-        if self.cuda:
+        self.cuda_enabled = cuda
+        if self.cuda_enabled:
             self.embeddings = nn.Embedding(vocab_dim, embed_dim).cuda()
         else:
             self.embeddings = nn.Embedding(vocab_dim, embed_dim)
@@ -49,12 +49,12 @@ class NPLM_Summarizer(nn.Module):
         self.context = context
 
         if enc == "bow":
-            if self.cuda:
+            if self.cuda_enabled:
                 self.encoder = BOW_Encoder(cuda=True)
             else:
                 self.encoder = BOW_Encoder()
         else:
-            if self.cuda:
+            if self.cuda_enabled:
                 P = torch.FloatTensor(torch.randn(embed_dim, context * embed_dim)).cuda()
                 self.P = nn.Parameter(P)
                 self.encoder = Attention_Based_Encoder(context, embed_dim, 2, cuda=True)
