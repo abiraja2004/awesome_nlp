@@ -34,7 +34,10 @@ class NPLM_Summarizer(nn.Module):
     def __init__(self, context, vocab_dim, embed_dim, hidden, enc, embed=None, cuda=False):
         super().__init__()
         self.cuda = cuda
-        self.embeddings = nn.Embedding(vocab_dim, embed_dim)
+        if self.cuda:
+            self.embeddings = nn.Embedding(vocab_dim, embed_dim).cuda()
+        else:
+            self.embeddings = nn.Embedding(vocab_dim, embed_dim)
 
         # Use pretrained weights, a numpy matrix of shape vocab_dim x embed_dim
         if embed is not None:
