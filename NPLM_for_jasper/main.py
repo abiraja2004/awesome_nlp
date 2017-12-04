@@ -100,6 +100,12 @@ if __name__ == "__main__":
     parser.add_argument('--nr_docs', type=int, default=0,
                         help='number of documents to use from training set')
     args = parser.parse_args()
+    if args.cuda and torch.cuda.is_available():
+        cuda_enabled = True
+        print("CUDA is enabled")
+    else:
+        cuda_enabled = False
+        print("CUDA is disabled")
 
     logging.basicConfig(level=logging.INFO)
 
@@ -121,6 +127,8 @@ if __name__ == "__main__":
     # Initalize the network
     model = NPLM_Summarizer(args.context_size, len(w2i), len(embed[0, :]),
                             args.nhid, args.encoder, embed)
+    if cuda_enabled:
+        model.cuda()
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     opt = optim.Adam(params=parameters, lr=args.lr, weight_decay=1e-5)
     criterion = nn.NLLLoss()
@@ -135,8 +143,10 @@ if __name__ == "__main__":
             # Forward pass
             filled_batch = fill_batch(docs, batch)
             sequences, summaries, continuations = filled_batch
-
-            scores = model.forward(Var(sequences), Var(summaries), True)
+            if cuda_enabled:
+                scores = model.forward(Var(sequences).cuda(), Var(summaries).cuda(), True)
+            else:
+                scores = model.forward(Var(sequences), Var(summaries), True)
             logging.debug("Epoch {}, iter {}. Forward pass done.".format(i, j))
 
             # Calculate loss
