@@ -1,2 +1,9 @@
 RAN/data/
 __pycache__/
+opinosis/
+sumdata
+glove.6B
+sumdata/
+glove.6B/
+nplm_model.pt
+summaries.txt

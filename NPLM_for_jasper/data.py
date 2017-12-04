@@ -157,7 +157,7 @@ class Gigaword_Collection(object):
         Add words to the dictionary.
         """
         # Add start and end tags
-        return ['<s>'] + nltk.word_tokenize(sentence) + ['/s']
+        return ['<s>'] +  nltk.word_tokenize(sentence) + ['/s']
 
 
 class Opinosis_Collection(object):
