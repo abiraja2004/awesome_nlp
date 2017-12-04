@@ -16,14 +16,17 @@ from utils import load_glove_matrix
 from collections import Counter
 
 
-def evaluate(model, docs, pairs):
+def evaluate(model, docs, pairs, cuda_enabled):
     """
     Evaluate a model by generating
     """
     correct = 0
 
     for index, _, summary, continuation in pairs:
-        scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
+        if cuda_enabled:
+            scores = model.forward(Var(LT(docs[index])).cuda(), Var(LT(summary)).cuda(), False)
+        else:
+            scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
         predict = scores.data.numpy().argmax(axis=1)[0]
 
         if predict == int(continuation[0]):
@@ -165,7 +168,7 @@ if __name__ == "__main__":
 
             # Output accuracy
             if j % 10000 == 0:
-                _, _, acc = evaluate(model, docs, train[:100])
+                _, _, acc = evaluate(model, docs, train[:100], cuda_enabled)
                 print("Epoch {}, iter {}, train acc={}".format(i, j, acc))
         torch.save(model, "models/epoch{}_".format(i) + args.save)
 
