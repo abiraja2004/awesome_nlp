@@ -29,18 +29,11 @@ class Greedy_Decoder(Decoder):
         summary = [self.word2idx['<s>']] * self.C
         sequence = Variable(LT([self.word2idx[w] for w in sequence]))
 
-        if sentences:
-            i = 0
-            # Greedily select the word with the highest probability
-            end_tag = self.word2idx['</s>']
-            while summary.count(end_tag) < len and len(summary) < 100:
-                summary = self. find_next_word(summary, i, model, sequence)
-                i += 1
-        else:
-            # Greedily select the word with the highest probability
-
-            for i in range(self.C, len+self.C-1):
-                summary = self. find_next_word(summary, i, model, sequence)
+        # Greedily select the word with the highest probability
+        for i in range(self.C, len+self.C-1):
+            summary = self.find_next_word(summary, i, model, sequence)
+            if self.word2idx['</s>'] in summary:
+                break
 
         # Indices to words
         summary = [self.idx2word[w] for w in summary[self.C-1:]]
@@ -81,6 +74,7 @@ class Beam_Search_Decoder(Decoder):
         probs, indices = self.predict(model, sequence, summary[:self.C])
         hypotheses = [(summary + [indices[0][i]], probs[0][i])
                       for i in range(self.beam_size)]
+        final = []
         if self.verbose:
             print("Top K")
             for hypothesis in hypotheses:
@@ -107,7 +101,6 @@ class Beam_Search_Decoder(Decoder):
 
             # Select top K hypotheses from new_hypotheses
             hypotheses = self.select_top(list(n_h.values()), self.beam_size)
-
             if self.verbose:
                 print("New Hypotheses")
                 for key in n_h:
@@ -115,6 +108,20 @@ class Beam_Search_Decoder(Decoder):
                 print("Top K")
                 for hypothesis in hypotheses:
                     self.print_hypothesis(hypothesis)
+
+            for h in hypotheses:
+                tmp = []
+                if self.word2idx["</s>"] in h:
+                    final.append(h)
+                    self.beam_size = self.beam_size - 1
+                else:
+                    tmp.append(h)
+                hypotheses = tmp
+
+            if self.beam_size == 0 or not hypotheses:
+                break
+
+        hypotheses.extend(final)
 
         # Indices to words
         summary, prob = self.select_top(hypotheses, 1)[0]
