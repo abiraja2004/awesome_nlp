@@ -11,7 +11,7 @@ from random import shuffle
 # Import objects and functions customized for the abstractive summarization
 from NPLM import NPLM_Summarizer
 from Decoder import Greedy_Decoder, Beam_Search_Decoder
-from data import Opinosis_Collection, Gigaword_Collection
+from data import Gigaword_Collection
 from utils import load_glove_matrix
 from collections import Counter
 
@@ -157,14 +157,21 @@ if __name__ == "__main__":
         torch.save(model, "models/epoch{}_".format(i) + args.save)
 
     logging.info("Finished training!")
-    # logging.info("Finished training, new summaries are predicted.")
-    # # Output predicted summaries to file
-    # s = []
-    # s.append("\n\nEpoch {}\n---------------".format(i))
-    # for k in range(0, args.nr_docs):
-    #     doc = corpus.documents[k].text
-    #     gold_summary = corpus.summaries[k]
-    #     summary = decoder.decode(doc, model, len(gold_summary), False)
-    #     s.append("predicted summary: " + " ".join(summary))
-    #     s.append("gold summary: " + " ".join(gold_summary) + "\n")
-    # open(args.save_summaries, 'a').write("\n".join(s))
+    logging.info("Finished training, new summaries are predicted.")
+    # Output predicted summaries to file
+
+    predictions = []
+    gold = []
+    for k in range(0, args.nr_docs):
+        doc = corpus.documents[k]
+        gold_summary = corpus.summaries[k]
+        summary = decoder.decode(doc, model, len(gold_summary.split()), False)
+        if summary[0] == "<s>":
+            del summary[0]
+        if summary[-1] == "</s>":
+            del summary[-1]
+        predictions.append(" ".join(summary))
+        gold.append(gold_summary)
+        # s.append("gold summary: " + " ".join(gold_summary) + "\n")
+    open(args.save_summaries, 'w').write("\n".join(predictions))
+    open("gold.txt", 'w').write("".join(gold))
