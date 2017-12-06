@@ -1,15 +1,14 @@
-import nltk
 import torch
+from torch import nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from utils import load_glove_matrix
 import logging
-import numpy as np
 
 
-class BOW_Encoder():
+class BOW_Encoder(nn.Module):
     """Simple Bag of Words encoder. Does not take into account word order."""
     def __init__(self):
+        super().__init__()
         logging.info("BOW Encoder initialized.")
 
     def encode(self, embeds_x, embeds_y, M):
@@ -18,9 +17,10 @@ class BOW_Encoder():
         return enc
 
 
-class Attention_Based_Encoder():
+class Attention_Based_Encoder(nn.Module):
     """Attention based encoder, builds upon the BOW Encoder."""
     def __init__(self, context, embed_dim, Q):
+        super().__init__()
         self.Q = Q
         self.contex = context
         self.embed_dim = embed_dim
@@ -29,6 +29,7 @@ class Attention_Based_Encoder():
     def encode(self, embeds_x, embeds_y, P, M):
         # x bar is a smoothed version of x tilde
         x_dim = embeds_x.size()
+
         x_bar = torch.FloatTensor(x_dim)
 
         for i in range(M):
@@ -38,14 +39,24 @@ class Attention_Based_Encoder():
             # batch mode
             if len(x_dim) == 3:
                 x_bar[:, i, :] = torch.sum(
-                    embeds_x.data[:, s:e, :], 1) / self.Q
+                    embeds_x.data[:, s:e, :], 1) / (self.Q*2)
             # regular mode
             elif len(x_dim) == 2:
                 x_bar[i, :] = torch.sum(embeds_x.data[s:e, :], 0) / self.Q
         x_bar = Variable(x_bar)
 
-        a = P @ embeds_y.t()
+        a = P @ embeds_y
         p = embeds_x @ a
-        p = F.softmax(p.t())
-        enc = p @ x_bar
+
+        if len(x_dim) == 3:
+            # You cannot specify an axis, so you have to transpose and
+            # reverse that afterwards. Very annoying pytorch feature...
+            p = (F.softmax(p.transpose(0, 1)))
+            p = p.transpose(0, 1)
+
+            x_bar = x_bar.transpose(1, 2)
+            enc = (x_bar @ p).squeeze(2)
+        else:
+            p = F.softmax(p.squeeze(2))
+            enc = p @ x_bar
         return enc
