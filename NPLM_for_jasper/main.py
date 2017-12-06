@@ -16,15 +16,18 @@ from utils import load_glove_matrix
 from collections import Counter
 
 
-def evaluate(model, docs, pairs):
+def evaluate(model, docs, pairs, cuda_enabled):
     """
     Evaluate a model by generating
     """
     correct = 0
 
     for index, _, summary, continuation in pairs:
-        scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
-        predict = scores.data.numpy().argmax(axis=1)[0]
+        if cuda_enabled:
+            scores = model.forward(Var(LT(docs[index])).cuda(), Var(LT(summary)).cuda(), False)
+        else:
+            scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
+        predict = scores.data.cpu().numpy().argmax(axis=1)[0]
 
         if predict == int(continuation[0]):
             correct += 1
@@ -100,6 +103,12 @@ if __name__ == "__main__":
     parser.add_argument('--nr_docs', type=int, default=0,
                         help='number of documents to use from training set')
     args = parser.parse_args()
+    if args.cuda and torch.cuda.is_available():
+        cuda_enabled = True
+        print("CUDA is enabled")
+    else:
+        cuda_enabled = False
+        print("CUDA is disabled")
 
     logging.basicConfig(level=logging.INFO)
 
@@ -120,7 +129,9 @@ if __name__ == "__main__":
 
     # Initalize the network
     model = NPLM_Summarizer(args.context_size, len(w2i), len(embed[0, :]),
-                            args.nhid, args.encoder, embed)
+                            args.nhid, args.encoder, embed, cuda=cuda_enabled)
+    if cuda_enabled:
+        model.cuda()
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     opt = optim.Adam(params=parameters, lr=args.lr, weight_decay=1e-5)
     criterion = nn.NLLLoss()
@@ -135,12 +146,17 @@ if __name__ == "__main__":
             # Forward pass
             filled_batch = fill_batch(docs, batch)
             sequences, summaries, continuations = filled_batch
-
-            scores = model.forward(Var(sequences), Var(summaries), True)
+            if cuda_enabled:
+                scores = model.forward(Var(sequences).cuda(), Var(summaries).cuda(), True)
+            else:
+                scores = model.forward(Var(sequences), Var(summaries), True)
             logging.debug("Epoch {}, iter {}. Forward pass done.".format(i, j))
 
             # Calculate loss
-            output = criterion(scores, Var(continuations))
+            if cuda_enabled:
+                output = criterion(scores, Var(continuations).cuda())
+            else:
+                output = criterion(scores, Var(continuations))
             logging.debug("Epoch {}, iter {}. Calculated loss.".format(i, j))
 
             # Backward pass
@@ -152,7 +168,7 @@ if __name__ == "__main__":
 
             # Output accuracy
             if j % 10000 == 0:
-                _, _, acc = evaluate(model, docs, train[:100])
+                _, _, acc = evaluate(model, docs, train[:100], cuda_enabled)
                 print("Epoch {}, iter {}, train acc={}".format(i, j, acc))
         torch.save(model, "models/epoch{}_".format(i) + args.save)
 
