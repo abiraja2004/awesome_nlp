@@ -89,7 +89,7 @@ class Gigaword_Collection(object):
     """
     Collects documents and corresponding summaries.
     """
-    def __init__(self, documents_file, summaries_file, nr_docs):
+    def __init__(self, documents_file, summaries_file, nr_docs, dicts=True):
         if nr_docs == 0:
             nr_docs = -1
         self.documents_path = documents_file
@@ -98,21 +98,22 @@ class Gigaword_Collection(object):
         self.summaries = open(self.summaries_path, 'r').readlines()[:nr_docs]
         self.dictionary = Dictionary()
 
-        # Extract all text and fill dicts
-        total = len(self.documents)
-        for i in range(total):
-            if i % 100000 == 0:
-                logging.debug("Loading documents, {} / {}.".format(i, total))
-            document = self.prepare(self.documents[i])
-            self.dictionary.add_text(set(document))
+        if dicts:
+            # Extract all text and fill dicts
+            total = len(self.documents)
+            for i in range(total):
+                if i % 100000 == 0:
+                    logging.debug("Loading documents, {} / {}.".format(i, total))
+                document = self.prepare(self.documents[i])
+                self.dictionary.add_text(set(document))
 
-        for i in range(total):
-            if i % 100000 == 0:
-                logging.debug("Loading summaries, {} / {}.".format(i, total))
-            summary = self.prepare(self.summaries[i])
-            self.dictionary.add_text(set(summary))
+            for i in range(total):
+                if i % 100000 == 0:
+                    logging.debug("Loading summaries, {} / {}.".format(i, total))
+                summary = self.prepare(self.summaries[i])
+                self.dictionary.add_text(set(summary))
 
-        self.dictionary.to_unk()
+            self.dictionary.to_unk()
         logging.info("Initialized corpus.")
 
     def collection_to_pairs(self, context):
