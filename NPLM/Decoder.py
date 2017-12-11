@@ -27,7 +27,7 @@ class Greedy_Decoder(Decoder):
 
         # Initalize the sentence with enough starting tags
         summary = [self.word2idx['<s>']] * self.C
-        sequence = Variable(LT([self.word2idx[w] for w in sequence]))
+        sequence = Variable(LT([[self.word2idx[w] for w in sequence]]))
 
         # Greedily select the word with the highest probability
         for i in range(self.C, len+self.C-1):
@@ -41,13 +41,13 @@ class Greedy_Decoder(Decoder):
 
     def find_next_word(self, summary, i, model, sequence):
         # Ensure that we do not predict unk
-        summary_i = Variable(LT(summary[i - self.C:i]))
-        scores = model.forward(sequence, summary_i, False)
+        summary_i = Variable(LT([summary[i - self.C:i]]))
+        scores = model.forward(sequence, summary_i, True)
         prob, index = torch.topk(scores.data, 2)
-        if self.idx2word[index[0][0]] == "unk":
-            summary.append(index[0][1])
-        else:
-            summary.append(index[0][0])
+        # if self.idx2word[index[0][0]] == "unk":
+        #     summary.append(index[0][1])
+        # else:
+        summary.append(index[0][0])
         return summary
 
 
@@ -59,6 +59,7 @@ class Beam_Search_Decoder(Decoder):
     def __init__(self, w2i, i2w, context_size, length, beam_size, verbose=False):
         super().__init__(w2i, i2w, context_size, length)
         self.beam_size = beam_size
+        self.original_beam_size = beam_size
         logging.info("Beam Search Decoder initialized.")
         self.verbose = verbose
 
@@ -68,17 +69,17 @@ class Beam_Search_Decoder(Decoder):
 
         # Initalize the summary with enough starting tags
         summary = [self.word2idx['<s>']] * self.C
-        sequence = Variable(LT([self.word2idx[w] for w in sequence]))
+        sequence = Variable(LT([[self.word2idx[w] for w in sequence]]))
 
         # Initialize hypotheses with three most probable words after start tags
         probs, indices = self.predict(model, sequence, summary[:self.C])
         hypotheses = [(summary + [indices[0][i]], probs[0][i])
                       for i in range(self.beam_size)]
         final = []
-        if self.verbose:
-            print("Top K")
-            for hypothesis in hypotheses:
-                self.print_hypothesis(hypothesis)
+        # if self.verbose:
+        #     print("Top K")
+        #     for hypothesis in hypotheses:
+        #         self.print_hypothesis(hypothesis)
 
         # For every index in summary, reestimate top K best hypotheses
         for i in range(self.C+1, length+self.C-1):
@@ -101,52 +102,56 @@ class Beam_Search_Decoder(Decoder):
 
             # Select top K hypotheses from new_hypotheses
             hypotheses = self.select_top(list(n_h.values()), self.beam_size)
-            if self.verbose:
-                print("New Hypotheses")
-                for key in n_h:
-                    self.print_hypothesis(n_h[key])
-                print("Top K")
-                for hypothesis in hypotheses:
-                    self.print_hypothesis(hypothesis)
+            # if self.verbose:
+            #     print("New Hypotheses")
+            #     for key in n_h:
+            #         self.print_hypothesis(n_h[key])
+            #     print("Top K")
+            #     for hypothesis in hypotheses:
+            #         self.print_hypothesis(hypothesis)
 
+            tmp = []
             for h in hypotheses:
-                tmp = []
-                if self.word2idx["</s>"] in h:
+                if self.word2idx["</s>"] in h[0]:
                     final.append(h)
                     self.beam_size = self.beam_size - 1
                 else:
                     tmp.append(h)
-                hypotheses = tmp
+            hypotheses = tmp
 
-            if self.beam_size == 0 or not hypotheses:
+            if self.beam_size == 0:
                 break
 
         hypotheses.extend(final)
 
         # Indices to words
-        summary, prob = self.select_top(hypotheses, 1)[0]
+        summary, prob = self.select_top(hypotheses, 1, True)[0]
         summary = [self.idx2word[w] for w in summary[self.C - 1:]]
+        self.beam_size = self.original_beam_size
         return(summary)
 
     def predict(self, model, sequence, summary):
-        summary_i = Variable(torch.LongTensor(summary))
-        scores = model.forward(sequence, summary_i, False)
+        summary_i = Variable(torch.LongTensor([summary]))
+        scores = model.forward(sequence, summary_i, True)
         prob, index = torch.topk(scores.data, self.beam_size)
         return prob, index
 
-    def select_top(self, hypotheses, K):
+    def select_top(self, hypotheses, K, final=False):
         # Ensure that we do not predict unk
         to_delete = []
-        for i, h in enumerate(hypotheses):
-            if self.idx2word[h[0][-1]] == "unk":
-                to_delete.append(i)
+        # for i, h in enumerate(hypotheses):
+        #     if self.idx2word[h[0][-1]] == "unk":
+        #         to_delete.append(i)
 
-        # do not delete hypotheses if all predict unk
-        if len(hypotheses) != len(to_delete):
-            for index in to_delete:
-                hypotheses.pop(index)
+        # # do not delete hypotheses if all predict unk
+        # if len(hypotheses) != len(to_delete):
+        #     for index in to_delete:
+        #         hypotheses.pop(index)
 
         # Select top K hypotheses with highest probs
+        if final:
+            for i, (hypothesis, prob) in enumerate(hypotheses):
+                hypotheses[i] = (hypothesis, prob / len(hypothesis))
         return sorted(hypotheses, key=lambda x: x[1], reverse=True)[:K]
 
     def print_hypothesis(self, hypothesis):
