@@ -25,7 +25,6 @@ def evaluate(model, docs, pairs):
     for index, _, summary, continuation in pairs:
         scores = model.forward(Var(LT(docs[index])), Var(LT(summary)), False)
         predict = scores.data.numpy().argmax(axis=1)[0]
-
         if predict == int(continuation[0]):
             correct += 1
 
@@ -65,17 +64,17 @@ def fill_batch(docs, batch):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='NPLM Language Model for abstractive summarization.')
-    parser.add_argument('--documents', type=str, default='../opinosis/topics/',
+    parser.add_argument('--documents', type=str, default='../sumdata/train/train.article.txt',
                         help='path to documents to summarize')
     parser.add_argument('--summaries', type=str, help='path to gold summaries',
-                        default='../opinosis/summaries-gold')
-    parser.add_argument('--emfile', default="../glove.6B/glove.6B.300d.txt",
+                        default='../sumdata/train/train.title.txt')
+    parser.add_argument('--emfile', default="../glove.6B/glove.6B.200d.txt",
                         type=str, help='word embeddings file')
     parser.add_argument('--nhid', type=int, default=200,
                         help='number of hidden units per layer')
     parser.add_argument('--lr', type=float, default=0.01,
                         help='initial learning rate')
-    parser.add_argument('--epochs', type=int, default=40,
+    parser.add_argument('--epochs', type=int, default=10,
                         help='upper epoch limit')
     parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                         help='batch size')
@@ -107,7 +106,7 @@ if __name__ == "__main__":
     corpus = Gigaword_Collection(args.documents, args.summaries,
                                  args.nr_docs)
     docs, train = corpus.collection_to_pairs(args.context_size)
-    shuffle(train)
+    # shuffle(train)
     w2i = corpus.dictionary.word2idx
     i2w = corpus.dictionary.idx2word
     pickle.dump(list(w2i.items()), open("models/w2i.pickle", 'wb'))
@@ -115,14 +114,14 @@ if __name__ == "__main__":
     batches = batchify(docs, train, args.batch_size)
     logging.info("Loaded data.")
 
-    embed = load_glove_matrix(w2i, "../glove.6B/glove.6B.300d.txt")
+    embed = load_glove_matrix(w2i, "../glove.6B/glove.6B.200d.txt")
     logging.info("Initialized word embeddings with Glove.")
 
     # Initalize the network
     model = NPLM_Summarizer(args.context_size, len(w2i), len(embed[0, :]),
                             args.nhid, args.encoder, embed)
-    parameters = filter(lambda p: p.requires_grad, model.parameters())
-    opt = optim.Adam(params=parameters, lr=args.lr, weight_decay=1e-5)
+    # parameters = filter(lambda p: p.requires_grad, model.parameters())
+    opt = optim.SGD(params=model.parameters(), lr=args.lr)
     criterion = nn.NLLLoss()
     if args.decoder == "grd":
         decoder = Greedy_Decoder(w2i, i2w, args.context_size, args.length)
