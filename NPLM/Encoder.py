@@ -39,7 +39,7 @@ class Attention_Based_Encoder(nn.Module):
             # batch mode
             if len(x_dim) == 3:
                 x_bar[:, i, :] = torch.sum(
-                    embeds_x.data[:, s:e, :], 1) / (self.Q*2)
+                    embeds_x.data[:, s:e, :], 1) / self.Q
             # regular mode
             elif len(x_dim) == 2:
                 x_bar[i, :] = torch.sum(embeds_x.data[s:e, :], 0) / self.Q
@@ -57,6 +57,8 @@ class Attention_Based_Encoder(nn.Module):
             x_bar = x_bar.transpose(1, 2)
             enc = (x_bar @ p).squeeze(2)
         else:
-            p = F.softmax(p.squeeze(2))
-            enc = p @ x_bar
-        return enc
+            p = p.transpose(0, 1)
+            p = F.softmax(p)
+            enc = (p.transpose(0, 2) @ x_bar).squeeze(0)
+
+        return enc.squeeze(0)
