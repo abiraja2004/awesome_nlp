@@ -1,102 +1,146 @@
-from __future__ import unicode_literals, print_function, division
-from io import open
-import unicodedata
-import re
-
-MAX_LENGTH = 10
-
-eng_prefixes = (
-    "i am ", "i m ",
-    "he is", "he s ",
-    "she is", "she s",
-    "you are", "you re ",
-    "we are", "we re ",
-    "they are", "they re "
-)
+import os
+import nltk
+import logging
+from torch import LongTensor as LT
+from collections import defaultdict
+from torch.autograd import Variable as Var
 
 
-class Lang:
-    def __init__(self, name):
-        self.name = name
-        self.word2index = {}
-        self.word2count = {}
-        self.index2word = {0: "SOS", 1: "EOS"}
-        self.n_words = 2  # Count SOS and EOS
+class Dictionary(object):
+    """
+    Object that creates and keeps word2idx and idx2word dicts.
+    Do not forget to call to_unk when the word2idx dict is filled.
+    """
+    def __init__(self):
+        self.word2idx = defaultdict(lambda: len(self.word2idx))
+        self.idx2word = dict()
+        self.add_word("<s>")
+        self.add_word("</s>")
 
-    def addSentence(self, sentence):
-        for word in sentence.split(' '):
-            self.addWord(word)
+    def add_word(self, word):
+        index = self.word2idx[word]
+        self.idx2word[index] = word
+        return index
 
-    def addWord(self, word):
-        if word not in self.word2index:
-            self.word2index[word] = self.n_words
-            self.word2count[word] = 1
-            self.index2word[self.n_words] = word
-            self.n_words += 1
+    def add_text(self, text):
+        for word in text:
+            self.add_word(word)
+
+    def to_unk(self):
+        UNK = self.add_word("unk")
+        self.word2idx = defaultdict(lambda: UNK, self.word2idx)
+
+
+class Corpus(object):
+    def __init__(self, path):
+        self.train = Text(os.path.join(path, 'train.txt'))
+        self.valid = Text(os.path.join(path, 'valid.txt'))
+        self.test = Text(os.path.join(path, 'test.txt'))
+
+
+class Text(object):
+    def __init__(self, text, from_file=True, end_tags=False):
+        self.end_tags = end_tags
+        if from_file:
+            self.text = self.from_file(text)
+            self.name = text.split('/')[-1]
         else:
-            self.word2count[word] += 1
+            self.text = self.from_var(text)
+
+    def from_file(self, path):
+        """
+        Read a text from a filepath.
+        """
+        assert os.path.exists(path)
+
+        # Tokenize file content
+        with open(path, 'r', errors='ignore') as f:
+            sentences = nltk.sent_tokenize(f.read())
+        sentences = [nltk.word_tokenize(s) for s in sentences]
+        text = self.prepare(sentences)
+        sentences = []
+        return text
+
+    def from_var(self, sentences):
+        """
+        Read a text from a string.
+        """
+        sentences = nltk.sent_tokenize(sentences)
+        sentences = [nltk.word_tokenize(s) for s in sentences]
+        text = self.prepare(sentences)
+        sentences = []
+        return text
+
+    def prepare(self, sentences):
+        """
+        Add start and end tags (end tags only if preferred).
+        Add words to the dictionary.
+        """
+        # Add start and end tags
+        for i, s in enumerate(sentences):
+            sentences[i] = ['<s>'] + s
+            if self.end_tags:
+                sentences[i] = sentences[i] + ['</s>']
+
+        # Add words to dictionary
+        words = [word for s in sentences for word in s]
+        sentences = []
+        return words
 
 
-# Turn a Unicode string to plain ASCII, thanks to
-# http://stackoverflow.com/a/518232/2809427
-def unicodeToAscii(s):
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn'
-    )
+class Gigaword_Collection(object):
+    """
+    Collects documents and corresponding summaries.
+    """
+    def __init__(self, documents_file, summaries_file, nr_docs):
+        if nr_docs == 0:
+            nr_docs = -1
+        self.documents_path = documents_file
+        self.summaries_path = summaries_file
+        self.documents = open(self.documents_path, 'r').readlines()[:nr_docs]
+        self.summaries = open(self.summaries_path, 'r').readlines()[:nr_docs]
+        self.dictionary = Dictionary()
+        self.pairs = []
 
-# Lowercase, trim, and remove non-letter characters
+        # Extract all text and fill dicts
+        total = len(self.documents)
+        for i in range(total):
+            if i % 100000 == 0:
+                logging.debug("Loading documents, {} / {}.".format(i, total))
+            self.dictionary.add_text(set(self.prepare(self.documents[i])))
 
+        for i in range(total):
+            if i % 100000 == 0:
+                logging.debug("Loading summaries, {} / {}.".format(i, total))
+            self.dictionary.add_text(set(self.prepare(self.summaries[i])))
 
-def normalizeString(s):
-    s = unicodeToAscii(s.lower().strip())
-    s = re.sub(r"([.!?])", r" \1", s)
-    s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
-    return s
+        self.dictionary.to_unk()
+        logging.info("Initialized corpus.")
 
+    def collection_to_pairs(self):
+        """
+        Create training pairs for the entire collection.
+        """
+        n = len(self.documents)
+        for i, document in enumerate(self.documents):
+            if i % 100000 == 0:
+                logging.debug("Preparing pairs for doc {}/{}.".format(i, n))
+            document = self.to_indices(self.prepare(document))
+            summary = self.to_indices(self.prepare(self.summaries[i]))
+            self.pairs.append((document, summary))
+        logging.info("Initialized training pairs.")
+        return self.pairs
 
-def readLangs(lang1, lang2, reverse=False):
-    print("Reading lines...")
+    def to_indices(self, sequence):
+        """
+        Represent a history of words as a list of indices.
+        """
+        return [self.dictionary.word2idx[w] for w in sequence]
 
-    # Read the file and split into lines
-    lines = open('../data/%s-%s.txt' % (lang1, lang2), encoding='utf-8').\
-        read().strip().split('\n')
-
-    # Split every line into pairs and normalize
-    pairs = [[normalizeString(s) for s in l.split('\t')] for l in lines]
-
-    # Reverse pairs, make Lang instances
-    if reverse:
-        pairs = [list(reversed(p)) for p in pairs]
-        input_lang = Lang(lang2)
-        output_lang = Lang(lang1)
-    else:
-        input_lang = Lang(lang1)
-        output_lang = Lang(lang2)
-
-    return input_lang, output_lang, pairs
-
-
-def filterPair(p):
-    return len(p[0].split(' ')) < MAX_LENGTH and \
-        len(p[1].split(' ')) < MAX_LENGTH and \
-        p[1].startswith(eng_prefixes)
-
-
-def filterPairs(pairs):
-    return [pair for pair in pairs if filterPair(pair)]
-
-
-def prepareData(lang1, lang2, reverse=False):
-    input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
-    print("Read %s sentence pairs" % len(pairs))
-    pairs = filterPairs(pairs)
-    print("Trimmed to %s sentence pairs" % len(pairs))
-    print("Counting words...")
-    for pair in pairs:
-        input_lang.addSentence(pair[0])
-        output_lang.addSentence(pair[1])
-    print("Counted words:")
-    print(input_lang.name, input_lang.n_words)
-    print(output_lang.name, output_lang.n_words)
-    return input_lang, output_lang, pairs
+    def prepare(self, sentence):
+        """
+        Add start and end tags (end tags only if preferred).
+        Add words to the dictionary.
+        """
+        # Add start and end tags
+        return ['<s>'] + nltk.word_tokenize(sentence) + ['</s>']
