@@ -3,93 +3,127 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
-from RNN import GRU
-
-MAX_LENGTH = 10
-
-class DecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size, n_layers=1, cuda=False):
-        super(DecoderRNN, self).__init__()
-        self.n_layers = n_layers
-        self.hidden_size = hidden_size
-
-        self.embedding = nn.Embedding(output_size, hidden_size)
-        self.gru = GRU(hidden_size, hidden_size)
-        self.out = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.LogSoftmax()
-        self.cuda = False
-
-    def forward(self, input, hidden):
-        output = self.embedding(input).view(1, 1, -1)
-        for i in range(self.n_layers):
-            output = F.relu(output)
-            output, hidden = self.gru(output, hidden)
-        output = self.softmax(self.out(output[0]))
-        return output, hidden
-
-    def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.hidden_size))
-        if self.cuda:
-            return result.cuda()
-        else:
-            return result
 
 
-class Recurrent_Decoder(nn.Module):
-    def __init__(self, hidden_size, output_size, n_layers=1, cuda=False):
-        super(Recurrent_Decoder, self).__init__()
-        self.n_layers = n_layers
-        self.hidden_size = hidden_size
+class Elman_Cell(nn.Module):
 
-        self.embedding = nn.Embedding(output_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size)
-        self.out = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.LogSoftmax()
-        self.cuda = False
+    def __init__(self, d, bias=True):
+        super(Elman_Cell, self).__init__()
+        self.d = d
 
-    def forward(self, input, hidden):
-        context = self.embedding(input).view(1, 1, -1)
-        for i in range(self.n_layers):
-            output = F.relu(context)
-            output, hidden = self.gru(output, hidden)
-        output = self.softmax(self.out(output[0]))
-        return output, hidden
+        # Modules
+        self.w1 = nn.Linear(d, d, bias=bias)
+        self.w2 = nn.Linear(d, d, bias=bias)
+        self.w3 = nn.Linear(d, d, bias=bias)
 
-    def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.hidden_size))
-        if self.cuda:
-            return result.cuda()
-        else:
-            return result
+    def forward(self, y, c, hidden):
+        r = F.sigmoid(self.w1(y) + self.w2(c) + self.w3(hidden))
+        return r
 
 
-class AttnDecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size, n_layers=1, dropout_p=0.1, max_length=MAX_LENGTH):
-        super(AttnDecoderRNN, self).__init__()
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.dropout_p = dropout_p
+class Elman_Decoder(nn.Module):
+    def __init__(self, d, V, embed, max_length=10, enable_cuda=False):
+        super(Elman_Decoder, self).__init__()
+        self.d = d
+        self.bias = True
+        self._load_cell()
+        self.d = d
+        self.V = V
         self.max_length = max_length
+        self.enable_cuda = enable_cuda
+        self.w4 = nn.Linear(self.d, self.V)
+        self.w5 = nn.Linear(self.d, self.V)
 
-        self.embedding = nn.Embedding(self.output_size, self.hidden_size)
-        self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
-        self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = GRU(self.hidden_size, self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, self.output_size)
-
-    def forward(self, y, hidden, encoder_output):
-        embedded = self.embedding(y).view(1, 1, -1)
-        output = self.dropout(embedded)
-
-        output = F.relu(output)
-        output, hidden = self.gru(output, encoder_output, hidden)
-        output = F.log_softmax(self.out(output[0]))
-        return output, hidden
+    def forward(self, y, hidden, c):
+        hidden = self.cell(y, c, hidden)
+        output = F.log_softmax((self.w4(hidden) + self.w5(c)).transpose(0, 2)).transpose(0, 2)
+        return output.squeeze(1), hidden
 
     def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.hidden_size))
-        if use_cuda:
+        result = Variable(torch.zeros(1, 1, self.d))
+        if self.enable_cuda:
             return result.cuda()
         else:
             return result
+
+    def _load_cell(self):
+        self.cell = Elman_Cell(self.d, self.bias)
+
+
+# class LSTM_Cell(nn.Module):
+
+#     def __init__(self, d, bias=True, batch_size=1):
+#         super(LSTM_Cell, self).__init__()
+#         self.d = d
+
+#         # Modules
+#         self.w1 = nn.Linear(d, d, bias=bias)
+#         self.w2 = nn.Linear(d, d, bias=bias)
+#         self.w3 = nn.Linear(d, d, bias=bias)
+#         self.w4 = nn.Linear(d, d, bias=bias)
+#         self.w5 = nn.Linear(d, d, bias=bias)
+#         self.w6 = nn.Linear(d, d, bias=bias)
+#         self.w7 = nn.Linear(d, d, bias=bias)
+#         self.w8 = nn.Linear(d, d, bias=bias)
+#         self.w9 = nn.Linear(d, d, bias=bias)
+#         self.w10 = nn.Linear(d, d, bias=bias)
+#         self.w11 = nn.Linear(d, d, bias=bias)
+#         self.w12 = nn.Linear(d, d, bias=bias)
+#         self.__init_m(batch_size)
+
+#     def __init_m(self, batch_size):
+#         self.former_m = [Variable(torch.FloatTensor(torch.zeros((1, self.d))))]
+
+#     def forward(self, y, c, hidden):
+#         i = F.sigmoid(self.w1(y) + self.w2(c) + self.w3(hidden))
+#         i_prime = F.tanh(self.w4(y) + self.w5(c) + self.w6(hidden))
+#         f = F.sigmoid(self.w7(y) + self.w8(c) + self.w9(hidden))
+#         o = F.sigmoid(self.w10(y) + self.w11(c) + self.w12(hidden))
+#         m = self.former_m[-1] * f + i * i_prime
+#         self.former_m.append(m)
+#         return m * o
+
+
+# class LSTM_Decoder(nn.Module):
+#     def __init__(self, d, V,  dropout, embed, max_length=10, cuda=False):
+#         super(LSTM_Decoder, self).__init__()
+#         self.d = d
+#         self.V = V
+#         self.max_length = max_length
+#         self.cuda
+
+#         self.embeddings = nn.Embedding(self.V, self.d)
+#         # Use pretrained weights, a numpy matrix of shape vocab_dim x embed_dim
+#         if embed is not None:
+#             self.embeddings.weight.data.copy_(torch.from_numpy(embed))
+#         self.dropout = nn.Dropout(dropout)
+#         self.w4 = nn.Linear(self.d, self.V)
+#         self.w5 = nn.Linear(self.d, self.V)
+
+#         self.d = d
+#         self.bias = True
+#         self._load_cell()
+
+#     def _load_cell(self):
+#         self.cell = LSTM_Cell(self.d, self.bias)
+
+#     def forward(self, y, hidden, c):
+#         y = self.embedding(y).view(1, 1, -1)
+#         y = self.dropout(y)
+#         batch_size = y.size(0)
+#         seq_length = y.size(1)
+
+#         output = []
+#         for i in range(min(seq_length, self.max_length)):
+#             hidden = self.cell(y[:, i, :], c, hidden=hidden)
+#             output.append(hidden)
+#         output = torch.cat(output, 1)
+#         output = F.log_softmax(self.w4(output[0]))
+#         return output, hidden
+
+#     def initHidden(self):
+#         result = Variable(torch.zeros(1, 1, self.d))
+#         if self.cuda:
+#             return result.cuda()
+#         else:
+#             return result
