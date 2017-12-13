@@ -1,5 +1,8 @@
 # awesome_nlp
 
+## Requirements
+- [sumy](https://pypi.python.org/pypi/sumy/0.7.0)
+
 ## New Plan of attack
 - Implement two Facebook papers using `pytorch`:
   - A neural attention model for abstractive sentence summarization
