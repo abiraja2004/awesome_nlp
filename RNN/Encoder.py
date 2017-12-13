@@ -4,63 +4,54 @@ import math
 import torch.nn as nn
 from torch import LongTensor, FloatTensor
 from torch.autograd import Variable
-from RNN import GRU
 import torch.nn.functional as F
 
 
-class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, n_layers=1, cuda=False):
-        super(EncoderRNN, self).__init__()
-        self.hidden_size = hidden_size
-
-        self.embedding = nn.Embedding(input_size, hidden_size)
-        self.gru = GRU(hidden_size, hidden_size)
-        self.cuda = cuda
-
-    def forward(self, y, x, hidden):
-        x = self.embedding(x).view(1, 1, -1)
-        y = self.embedding(y).view(1, 1, -1)
-        x, hidden = self.gru(y, x, hidden)
-        return x[0], hidden
-
-    def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.hidden_size))
-        if self.cuda:
-            return result.cuda()
-        else:
-            return result
-
-
 class Attentive_Encoder(nn.Module):
-    def __init__(self, vocab_size, d, q, cuda=False):
+    def __init__(self, vocab_size, d, q, embed, enable_cuda=False):
         super(Attentive_Encoder, self).__init__()
         self.hidden_size = d
-        self.embedding = nn.Embedding(vocab_size, d)
-        self.positions = nn.Embedding(100, d)
+        if enable_cuda:
+            self.embeddings = nn.Embedding(vocab_size, d).cuda()
+            self.positions = nn.Embedding(100, d).cuda()
+            self.B = nn.Parameter(FloatTensor(torch.rand((d, d, q))),
+                                  requires_grad=True).cuda()
+        else:
+            self.embeddings = nn.Embedding(vocab_size, d)
+            self.positions = nn.Embedding(100, d)
+            self.B = nn.Parameter(FloatTensor(torch.rand((d, d, q))),
+                                  requires_grad=True)
+
+        # Use pretrained weights, a numpy matrix of shape vocab_dim x embed_dim
+        if False:
+            self.embeddings.weight.data.copy_(torch.from_numpy(embed))
         self.q = q
-        self.B = torch.FloatTensor(torch.rand((d, d, q)))
-        self.B = nn.Parameter(self.B)
-        self.cuda = cuda
+        self.enable_cuda = enable_cuda
 
-    def forward(self, x, y, hidden):
-        M = x.size()[0]
-        x_pos = Variable(LongTensor([i for i in range(M)]))
+    def forward(self, x, hidden, y):
+        y = self.embeddings(y)
+        if len(y.size()) < 3:
+            y = y.unsqueeze(1)
+        batch_size, M = x.size()
+        if self.enable_cuda:
+            x_pos = Variable(LongTensor([[i for i in range(M)]
+                                     for j in range(batch_size)])).cuda()
+        else:
+            x_pos = Variable(LongTensor([[i for i in range(M)]
+                                         for j in range(batch_size)]))
         x_pos = self.positions(x_pos)
-        x = self.embedding(x).squeeze(1)
-        a = (x + x_pos).squeeze(1)
+        x = self.embeddings(x)
+        a = (x + x_pos).transpose(1, 2)
+        z = F.conv1d(a, self.B, padding=int(math.floor(self.q/2)))
 
-        half_q = int(math.floor(self.q/2))
-        a = a.unsqueeze(0).transpose(1, 2)
-        z = F.conv1d(a, self.B, padding=half_q).transpose(1, 2)
+        # Very annoying feature: you cannot specify the axis for the
+        alphas = F.softmax((torch.matmul(hidden, z)).transpose(0, 2))
+        c = torch.matmul(alphas.transpose(0, 2), x)
+        return c, y
 
-        # Very annoying feature: you cannot specify the axis for the softmax
-        alphas = F.softmax((z @ hidden.transpose(1, 2)).transpose(0, 1))
-        c = alphas.transpose(0, 2) @ x
-        return c.transpose(0, 1)
-
-    def initHidden(self):
-        result = Variable(torch.rand((1, 1, self.hidden_size)))
-        if self.cuda:
+    def initHidden(self, batch_size):
+        result = Variable(torch.rand((batch_size, 1, self.hidden_size)))
+        if self.enable_cuda:
             return result.cuda()
         else:
             return result
