@@ -2,52 +2,40 @@ from __future__ import unicode_literals, print_function, division
 import random
 import torch
 from torch.autograd import Variable
-from train import variableFromSentence
-
-SOS_token = 0
-EOS_token = 1
-use_cuda = False
-MAX_LENGTH = 10
-teacher_forcing_ratio = 0.5
 
 
-def evaluate(input_lang, output_lang, encoder, decoder, sentence,
-             max_length=MAX_LENGTH):
-    hidden = encoder.initHidden()
-    sentence = variableFromSentence(input_lang, sentence)
+def evaluate(w2i, i2w, encoder, decoder, sentence,
+             max_length, enable_cuda=False):
+    hidden = encoder.initHidden(1)
+    sentence = Variable(torch.LongTensor([sentence]))
 
-    encoder_outputs = Variable(torch.zeros(max_length, encoder.hidden_size))
-    encoder_outputs = encoder_outputs.cuda() if use_cuda else encoder_outputs
-
-    decoder_input = Variable(torch.LongTensor([[SOS_token]]))
-    decoder_input = decoder_input.cuda() if use_cuda else decoder_input
+    y = Variable(torch.LongTensor([[w2i["<s>"]]]))
+    y = y.cuda() if enable_cuda else y
 
     decoded_words = []
 
     for di in range(max_length):
-        enc = encoder(sentence, decoder_input, hidden)
-        decoder_output, hidden = decoder(
-            decoder_input, hidden, enc)
+        enc, y = encoder(sentence, hidden, y)
+        decoder_output, hidden = decoder(y, hidden, enc)
         topv, topi = decoder_output.data.topk(1)
         ni = topi[0][0]
-        if ni == EOS_token:
-            decoded_words.append('<EOS>')
+        if ni == w2i["</s>"]:
+            decoded_words.append('</s>')
             break
         else:
-            decoded_words.append(output_lang.index2word[ni])
+            decoded_words.append(i2w[ni])
 
-        decoder_input = Variable(torch.LongTensor([[ni]]))
-        decoder_input = decoder_input.cuda() if use_cuda else decoder_input
+        y = Variable(torch.LongTensor([[ni]]))
+        y = y.cuda() if enable_cuda else y
     return decoded_words
 
 
-
-def evaluateRandomly(input_lang, output_lang, pairs, encoder, decoder, n=10):
-    for i in range(n):
+def evaluateRandomly(w2i, i2w, pairs, encoder, decoder, max_length, cuda=False):
+    for i in range(10):
         pair = random.choice(pairs)
-        print('>', pair[0])
-        print('=', pair[1])
-        output_words = evaluate(input_lang, output_lang, encoder, decoder, pair[0])
+        print('>', [i2w[word] for word in pair[0]])
+        print('=', [i2w[word] for word in pair[1]])
+        output_words = evaluate(w2i, i2w, encoder, decoder, pair[0], max_length, cuda)
         output_sentence = ' '.join(output_words)
         print('<', output_sentence)
         print('')
