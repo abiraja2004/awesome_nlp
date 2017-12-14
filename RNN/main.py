@@ -1,4 +1,4 @@
-from __future__ import unicode_literals, print_function, division
+import os
 from train import trainIters
 from evaluate import evaluateRandomly
 from Decoder import Elman_Decoder
@@ -112,11 +112,11 @@ if __name__ == "__main__":
     w2i = corpus.dictionary.word2idx
     i2w = corpus.dictionary.idx2word
 
-    pickle.dump(list(w2i.items()), open("models/w2i.pickle", 'wb'))
-    pickle.dump(list(i2w.items()), open("models/i2w.pickle", 'wb'))
+    pickle.dump(list(w2i.items()), open(os.path.dirname(os.path.realpath(__file__)) + "/models/w2i.pickle", 'wb'))
+    pickle.dump(list(i2w.items()), open(os.path.dirname(os.path.realpath(__file__)) + "/models/i2w.pickle", 'wb'))
 
     batches = batchify(train, w2i, args.batch_size)
-    pickle.dump(batches, open("batches.pickle", 'wb'))
+    pickle.dump(batches, open(os.path.dirname(os.path.realpath(__file__)) + "/batches.pickle", 'wb'))
     logging.info("Loaded data.")
 
     # embed = load_glove_matrix(w2i, args.emfile)
