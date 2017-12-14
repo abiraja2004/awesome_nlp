@@ -17,8 +17,8 @@ def trainIters(batches, w2i, encoder, decoder, epochs, learning_rate,
                max_length, teacher_forcing_ratio, enable_cuda=False):
     start = time.time()
     plot_losses = []
-    enc_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
-    dec_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
+    enc_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate, weight_decay=1e-06)
+    dec_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate, weight_decay=1e-06)
     criterion = nn.NLLLoss()
 
     for i in range(epochs):
