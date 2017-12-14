@@ -13,11 +13,13 @@ class Attentive_Encoder(nn.Module):
         self.hidden_size = d
         if enable_cuda:
             self.embeddings = nn.Embedding(vocab_size, d).cuda()
+            self.drop = nn.Dropout(p=0.2, inplace=False)
             self.positions = nn.Embedding(100, d).cuda()
             self.B = nn.Parameter(FloatTensor(torch.rand((d, d, q))),
                                   requires_grad=True).cuda()
         else:
             self.embeddings = nn.Embedding(vocab_size, d)
+            self.drop = nn.Dropout(p=0.2, inplace=False)
             self.positions = nn.Embedding(100, d)
             self.B = nn.Parameter(FloatTensor(torch.rand((d, d, q))),
                                   requires_grad=True)
@@ -32,6 +34,7 @@ class Attentive_Encoder(nn.Module):
         y = self.embeddings(y)
         if len(y.size()) < 3:
             y = y.unsqueeze(1)
+        y = self.drop(y)
         batch_size, M = x.size()
         if self.enable_cuda:
             x_pos = Variable(LongTensor([[i for i in range(M)]
@@ -41,6 +44,7 @@ class Attentive_Encoder(nn.Module):
                                          for j in range(batch_size)]))
         x_pos = self.positions(x_pos)
         x = self.embeddings(x)
+        x = self.drop(x)
         a = (x + x_pos).transpose(1, 2)
         z = F.conv1d(a, self.B, padding=int(math.floor(self.q/2)))
 

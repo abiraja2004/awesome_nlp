@@ -16,8 +16,8 @@ def trainIters(batches, w2i, encoder, decoder, epochs, learning_rate,
                max_length, teacher_forcing_ratio, enable_cuda=False):
     start = time.time()
     plot_losses = []
-    enc_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
-    dec_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
+    enc_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate, weight_decay=1e-06)
+    dec_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate, weight_decay=1e-06)
     criterion = nn.NLLLoss()
 
     for i in range(epochs):
@@ -35,7 +35,7 @@ def trainIters(batches, w2i, encoder, decoder, epochs, learning_rate,
                              dec_optimizer, criterion, max_length, w2i,
                              teacher_forcing_ratio, enable_cuda)
             total_loss += loss
-            if j % 3000 == 0:
+            if j % 30 == 0:
                 torch.save(encoder, os.path.dirname(os.path.realpath(__file__)) + "/models/epoch{}_batch{}_enc.pt".format(i, j))
                 torch.save(decoder, os.path.dirname(os.path.realpath(__file__)) + "/models/epoch{}_batch{}_dec.pt".format(i, j))
             logging.info("Epoch {}, batch {}/{}, average loss {}".format(
