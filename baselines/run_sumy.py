@@ -8,6 +8,7 @@ from sumy.summarizers.lsa import LsaSummarizer
 from sumy.summarizers.lex_rank import LexRankSummarizer
 from sumy.summarizers.text_rank import TextRankSummarizer
 from sumy.summarizers.luhn import LuhnSummarizer
+from sumy.summarizers.sum_basic import SumBasicSummarizer
 from sumy.nlp.stemmers import Stemmer
 from sumy.utils import get_stop_words
 
@@ -24,6 +25,7 @@ def main():
     run_LexRank(stemmer, parser.document)
     run_TextRank(stemmer, parser.document)
     run_Luhn(stemmer, parser.document)
+    run_SumBasic(stemmer, parser.document)
 
 
 def run_LSA(stemmer, document):
@@ -54,7 +56,15 @@ def run_Luhn(stemmer, document):
     return [x for x in luhn(document, SENTENCES_COUNT)]
 
 
-def gen_sum(document, alg="LSA"):
+def run_SumBasic(stemmer, document, n):
+    luhn = SumBasicSummarizer(stemmer)
+    luhn.stop_words = get_stop_words(LANGUAGE)
+    print("SumBasic: {}".format(n))
+    res = luhn(document, SENTENCES_COUNT)
+    return " ".join(str(res[0]).split()[:n])
+
+
+def gen_sum(document, n, alg="LSA"):
     parser = PlaintextParser.from_string(document, Tokenizer(LANGUAGE))
     stemmer = Stemmer(LANGUAGE)
 
@@ -66,6 +76,8 @@ def gen_sum(document, alg="LSA"):
         return run_TextRank(stemmer, parser.document)
     elif alg == "Luhn":
         return run_Luhn(stemmer, parser.document)
+    elif alg == "SumBasic":
+        return run_SumBasic(stemmer, parser.document, n)
     else:
         exit("Unkown extractive summarization algorithm!")
 
