@@ -1,5 +1,14 @@
 # awesome_nlp
+## Requirements
+#### Python3
+- pytorch
+- nltk
+- matplotlib
 
+#### Python2
+- [pke](https://github.com/boudinfl/pke)
+- [files2rouge](https://github.com/pltrdy/files2rouge)
+-
 ## Baselines:
 To generate summaries using the First-n and Random baseline, run:
 ```
