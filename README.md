@@ -38,10 +38,9 @@ In the folder 'model', a very small example model is provided, highly overfitted
 
 ### RNN
 #### Training
-TODO
-
-To use the BoW encoder, replace 'att' with 'bow'.
-
+```
+python main.py  --nr_docs 100 --batch_size 5 --lr 0.005 --epochs 5 --q 5 --documents <train.article.txt> --summaries <train.title.txt>
+```
 #### Testing
 ```
 python test.py --decoder bms --encoder <enc.pt> --rnn_decoder <dec.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
@@ -51,9 +50,10 @@ To use the greedy decoder, replace 'bms' with 'grd'.
 
 ### RAN
 #### Training
-TODO
+```
+python main.py  --nr_docs 100 --batch_size 5 --lr 0.005 --epochs 5 --q 5 --documents <train.article.txt> --summaries <train.title.txt>
+```
 
-To use the BoW encoder, replace 'att' with 'bow'.
 
 #### Testing
 ```
