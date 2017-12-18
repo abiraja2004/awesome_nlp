@@ -8,7 +8,7 @@
 #### Python2
 - [pke](https://github.com/boudinfl/pke)
 - [files2rouge](https://github.com/pltrdy/files2rouge)
--
+
 ## Baselines:
 To generate summaries using the First-n and Random baseline, run:
 ```
@@ -25,19 +25,25 @@ python2 baselines/pke_baseline.py <input> <limit>
 #### Training
 TODO
 #### Testing
-TODO
+python test.py --decoder bms --model <model.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
+
+python test.py --decoder grd --beam_size 5 --model <model.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
 
 ### RNN
 #### Training
 TODO
 #### Testing
-TODO
+python test.py --decoder bms --encoder <enc.pt> --rnn_decoder <dec.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
+
+python test.py --decoder grd --beam_size 5 --encoder <enc.pt> --rnn_decoder <dec.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
 
 ### RAN
 #### Training
 TODO
 #### Testing
-TODO
+python test.py --decoder bms --encoder <enc.pt> --ran_decoder <dec.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
+
+python test.py --decoder grd --beam_size 5 --encoder <enc.pt> --rnn_decoder <dec.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
 
 
 ## Evaluating generated summaries
