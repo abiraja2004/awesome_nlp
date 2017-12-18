@@ -61,4 +61,7 @@ class Attention_Based_Encoder(nn.Module):
             p = F.softmax(p)
             enc = (p.transpose(0, 2) @ x_bar).squeeze(0)
 
+        # if x_dim[1] < 20:
+        # print(p)
+
         return enc.squeeze(0)

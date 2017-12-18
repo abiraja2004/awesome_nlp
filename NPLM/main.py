@@ -164,7 +164,7 @@ if __name__ == "__main__":
     for k in range(0, args.nr_docs):
         doc = corpus.documents[k]
         gold_summary = corpus.summaries[k]
-        summary = decoder.decode(doc, model, len(gold_summary.split()), False)
+        summary = decoder.decode(doc, model, False)
         if summary[0] == "<s>":
             del summary[0]
         if summary[-1] == "</s>":

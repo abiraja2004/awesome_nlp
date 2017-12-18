@@ -79,4 +79,5 @@ class NPLM_Summarizer(nn.Module):
 
         hidden = F.tanh(hidden)
         out = torch.add(self.V(hidden), self.W(enc))
+
         return F.log_softmax(out)

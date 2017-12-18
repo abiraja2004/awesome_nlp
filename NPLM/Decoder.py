@@ -21,7 +21,7 @@ class Greedy_Decoder(Decoder):
         super().__init__(w2i, i2w, context_size, length)
         logging.info("Greedy Decoder initialized.")
 
-    def decode(self, sequence, model, len, sentences=False):
+    def decode(self, sequence, model, sentences=False):
         """Given a sequence and a model, generate a summary in a
         greedy manner."""
 
@@ -30,8 +30,9 @@ class Greedy_Decoder(Decoder):
         sequence = Variable(LT([[self.word2idx[w] for w in sequence]]))
 
         # Greedily select the word with the highest probability
-        for i in range(self.C, len+self.C-1):
+        for i in range(self.C, self.length+self.C-1):
             summary = self.find_next_word(summary, i, model, sequence)
+
             if self.word2idx['</s>'] in summary:
                 break
 
@@ -48,6 +49,7 @@ class Greedy_Decoder(Decoder):
         #     summary.append(index[0][1])
         # else:
         summary.append(index[0][0])
+        # print(self.idx2word[index[0][0]])
         return summary
 
 
@@ -63,7 +65,7 @@ class Beam_Search_Decoder(Decoder):
         logging.info("Beam Search Decoder initialized.")
         self.verbose = verbose
 
-    def decode(self, sequence, model, length, sentences=False):
+    def decode(self, sequence, model, sentences=False):
         """Given a sequence and a model, generate a summary according to
         beam search."""
 
@@ -82,7 +84,7 @@ class Beam_Search_Decoder(Decoder):
         #         self.print_hypothesis(hypothesis)
 
         # For every index in summary, reestimate top K best hypotheses
-        for i in range(self.C+1, length+self.C-1):
+        for i in range(self.C+1, self.length+self.C-1):
             # Gather beam_size * beam_size new hypotheses
             n_h = {}
             num_hypotheses = len(hypotheses)
@@ -107,14 +109,13 @@ class Beam_Search_Decoder(Decoder):
             #     for key in n_h:
             #         self.print_hypothesis(n_h[key])
             #     print("Top K")
-            #     for hypothesis in hypotheses:
+            #     for hypothesis in hypotheses:cd
             #         self.print_hypothesis(hypothesis)
 
             tmp = []
             for h in hypotheses:
                 if self.word2idx["</s>"] in h[0]:
                     final.append(h)
-                    self.beam_size = self.beam_size - 1
                 else:
                     tmp.append(h)
             hypotheses = tmp
@@ -151,7 +152,8 @@ class Beam_Search_Decoder(Decoder):
         # Select top K hypotheses with highest probs
         if final:
             for i, (hypothesis, prob) in enumerate(hypotheses):
-                hypotheses[i] = (hypothesis, prob / len(hypothesis))
+                lp = (5 + len(hypothesis))**1 / (5 + 1)**1
+                hypotheses[i] = (hypothesis, prob / lp)
         return sorted(hypotheses, key=lambda x: x[1], reverse=True)[:K]
 
     def print_hypothesis(self, hypothesis):

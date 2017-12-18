@@ -30,7 +30,7 @@ if __name__ == "__main__":
                         help='type of decoder: grd or bms')
     parser.add_argument('--beam_size', type=int, default=3,
                         help='beam size for beam search decoder')
-    parser.add_argument('--length', type=int, default=30,
+    parser.add_argument('--length', type=int, default=12,
                         help='desired summary length')
     parser.add_argument('--model', type=str, default='nplm_model.pt',
                         help='path for saving model')
@@ -54,7 +54,9 @@ if __name__ == "__main__":
     i2w = pickle.load(open(args.i2w, 'rb'))
     i2w = {key: value for key, value in i2w}
     w2i = defaultdict(lambda: w2i["unk"], w2i)
+    print(len(w2i))
     model = torch.load(args.model, map_location=lambda storage, location: storage)
+    print(model.encoder)
     corpus = Gigaword_Collection(args.documents, args.summaries, args.nr_docs,
                                  False)
 
@@ -70,7 +72,7 @@ if __name__ == "__main__":
                                       args.beam_size, args.verbose)
 
     # Output predicted summaries to file
-    print(model.embeddings)
+
     predictions = []
     gold = []
 
@@ -83,7 +85,8 @@ if __name__ == "__main__":
     for i in range(nr_docs):
         doc = corpus.prepare(corpus.documents[i])
         gold_summary = corpus.prepare(corpus.summaries[i])
-        summary = decoder.decode(doc, model, len(gold_summary), False)
+        summary = decoder.decode(doc, model, False)
+        #print(summary)
         predictions.append(" ".join(clean(summary)))
         gold.append(" ".join(clean(gold_summary)))
         docs.append(" ".join(doc))
