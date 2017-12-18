@@ -113,19 +113,26 @@ if __name__ == "__main__":
     w2i = corpus.dictionary.word2idx
     i2w = corpus.dictionary.idx2word
 
-    pickle.dump(list(w2i.items()), open(os.path.dirname(os.path.realpath(__file__)) + "/models/w2i.pickle", 'wb'))
-    pickle.dump(list(i2w.items()), open(os.path.dirname(os.path.realpath(__file__)) + "/models/i2w.pickle", 'wb'))
+    pickle.dump(list(w2i.items()), open(
+        os.path.dirname(os.path.realpath(__file__)) +
+        "/models/w2i.pickle", 'wb'))
+    pickle.dump(list(i2w.items()), open(
+        os.path.dirname(os.path.realpath(__file__)) +
+        "/models/i2w.pickle", 'wb'))
 
     batches = batchify(train, w2i, args.batch_size)
-    pickle.dump(batches, open(os.path.dirname(os.path.realpath(__file__)) + "/batches.pickle", 'wb'))
+    pickle.dump(batches, open(os.path.dirname(
+        os.path.realpath(__file__)) +
+        "/batches.pickle", 'wb'))
     logging.info("Loaded data.")
 
-    # embed = load_glove_matrix(w2i, args.emfile)
+    embed = load_glove_matrix(w2i, args.emfile)
     logging.info("Initialized embeddings.")
 
     dim = 200
-    encoder = Attentive_Encoder(len(w2i), dim, args.q, None, enable_cuda)
-    decoder = RAN_Decoder(dim, len(w2i), None, args.length, args.batch_size, enable_cuda)
+    encoder = Attentive_Encoder(len(w2i), dim, args.q, embed, enable_cuda)
+    decoder = RAN_Decoder(dim, len(w2i), embed, args.length, args.batch_size,
+                          enable_cuda)
 
     if enable_cuda:
         encoder.cuda()
@@ -136,4 +143,5 @@ if __name__ == "__main__":
     trainIters(batches, w2i, encoder, decoder, args.epochs, args.lr,
                args.length, args.ratio, enable_cuda)
 
-    evaluateRandomly(w2i, i2w, train, encoder, decoder, args.length, enable_cuda)
+    evaluateRandomly(w2i, i2w, train, encoder, decoder, args.length,
+                     enable_cuda)

@@ -1,20 +1,15 @@
 from __future__ import unicode_literals, print_function, division
-from evaluate import evaluateRandomly
 from data import Gigaword_Collection
 import torch
 import argparse
 import logging
 import pickle
-import torch.nn as nn
 from collections import defaultdict
 from torch.autograd import Variable
-from Decoder import RAN_Decoder
-from Encoder import Attentive_Encoder
-
-# Import objects and functions customized for the abstractive summarization
 
 
 def clean(sequence):
+    """Remove start and ending tags from sentence."""
     while "<s>" in sequence:
         sequence.remove("<s>")
     while "</s>" in sequence:
@@ -23,6 +18,7 @@ def clean(sequence):
 
 
 def greedy(w2i, i2w, encoder, decoder, sentence, max_length):
+    """Decode a sentence greedily."""
     hidden = encoder.initHidden(1)
     sentence = Variable(torch.LongTensor([[w2i[word] for word in sentence]]))
 
@@ -57,7 +53,8 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
     sentence = Variable(torch.LongTensor([[w2i[word] for word in sentence]]))
 
     # Initialize hypotheses with three most probable words after start tags
-    probs, indices, hidden = predict(encoder, decoder, sentence, y, hidden, beam_size)
+    probs, indices, hidden = predict(encoder, decoder, sentence, y, hidden,
+                                     beam_size)
     hypotheses = [(y, y + [indices[0][i]], probs[0][i], hidden)
                   for i in range(beam_size)]
     final = []
@@ -69,7 +66,8 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
         num_hypotheses = len(hypotheses)
         for j in range(num_hypotheses):
             y, summary, prob, hidden = hypotheses[j]
-            probs, indices, hidden = predict(encoder, decoder, sentence, y, hidden, beam_size)
+            probs, indices, hidden = predict(encoder, decoder, sentence, y,
+                                             hidden, beam_size)
 
             for k in range(len(indices[0])):
                 token = indices[0][k]
@@ -118,7 +116,7 @@ def select_top(hypotheses, K, final=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='NPLM Language Model for abstractive summarization.')
+        description='File for testing the RAN model.')
     parser.add_argument('--decoder', type=str, default='grd',
                         help='type of decoder: grd or bms')
     parser.add_argument('--beam_size', type=int, default=3,
@@ -127,22 +125,22 @@ if __name__ == "__main__":
                         help='desired summary length')
     parser.add_argument('--model', type=str, default='nplm_model.pt',
                         help='path for saving model')
-    parser.add_argument('--save_summaries', type=str, default='summaries.txt',
+    parser.add_argument('--save', type=str, default='summaries.txt',
                         help='file in which to save predicted summaries')
     parser.add_argument('--documents', type=str,
                         default='../sumdata/train/valid.article.txt')
     parser.add_argument('--summaries', type=str,
                         default='../sumdata/train/valid.title.txt')
-    parser.add_argument('--encoder', type=str)
-    parser.add_argument('--rnn_decoder', type=str)
+    parser.add_argument('--encoder', type=str, help='Encoder torch pt file.')
+    parser.add_argument('--rnn_decoder', type=str, help='Decoder torch pt file.')
     parser.add_argument('--w2i', default='models/w2i.pickle', type=str)
     parser.add_argument('--i2w', default='models/i2w.pickle', type=str)
-    parser.add_argument('--verbose', type=bool, default=False)
     parser.add_argument('--nr_docs', type=int, default=10000)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
 
+    # Load trained models along with dictionaries
     w2i = pickle.load(open(args.w2i, 'rb'))
     w2i = {key: value for key, value in w2i}
     i2w = pickle.load(open(args.i2w, 'rb'))
@@ -167,27 +165,14 @@ if __name__ == "__main__":
     docs = []
     for i in range(nr_docs):
         doc = corpus.prepare(corpus.documents[i])
-        # if len(doc) < 20 and 'oil' in doc:
-        #     print(doc)
-        # else:
-        #     continue
         gold_summary = corpus.prepare(corpus.summaries[i])
         if args.decoder == "grd":
             summary = greedy(w2i, i2w, encoder, decoder, doc, args.length)
         else:
-            summary = beam_search(w2i, i2w, encoder, decoder, doc, args.length, args.beam_size)
-        if len(summary) < 20 and 'oil' in doc:
-            print(summary)
+            summary = beam_search(w2i, i2w, encoder, decoder, doc, args.length,
+                                  args.beam_size)
         predictions.append(" ".join(clean(summary)))
         gold.append(" ".join(clean(gold_summary)))
         docs.append(" ".join(doc))
         logging.info("Creating summary for doc {} / {}.".format(i+1, nr_docs))
-        # s.append("gold summary: " + " ".join(gold_summary) + "\n")
-        if args.verbose:
-            print(doc)
-            print("=", gold_summary)
-            print("<", summary)
-            print()
-    open(args.save_summaries, 'w').write("\n".join(predictions))
-    open("gold.txt", 'w').write("\n".join(gold))
-    open("docs.txt", 'w').write("\n".join(docs))
+    open(args.save, 'w').write("\n".join(predictions))

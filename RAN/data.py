@@ -1,9 +1,6 @@
 import os
 import nltk
 import logging
-from torch import LongTensor as LT
-from collections import defaultdict
-from torch.autograd import Variable as Var
 
 
 class Dictionary(object):
