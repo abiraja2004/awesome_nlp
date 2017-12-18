@@ -1,15 +1,11 @@
 from __future__ import unicode_literals, print_function, division
-from evaluate import evaluateRandomly
 from data import Gigaword_Collection
 import torch
 import argparse
 import logging
 import pickle
-import torch.nn as nn
 from collections import defaultdict
 from torch.autograd import Variable
-
-# Import objects and functions customized for the abstractive summarization
 
 
 def clean(sequence):
@@ -53,7 +49,8 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
     sentence = Variable(torch.LongTensor([[w2i[word] for word in sentence]]))
 
     # Initialize hypotheses with three most probable words after start tags
-    probs, indices, hidden, a = predict(encoder, decoder, sentence, y, hidden, beam_size)
+    probs, indices, hidden, a = predict(encoder, decoder, sentence, y, hidden,
+                                        beam_size)
     hypotheses = [(y, y + [indices[0][i]], probs[0][i], hidden, [a])
                   for i in range(beam_size)]
     final = []
@@ -65,7 +62,8 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
         num_hypotheses = len(hypotheses)
         for j in range(num_hypotheses):
             y, summary, prob, hidden, alphas = hypotheses[j]
-            probs, indices, hidden, a = predict(encoder, decoder, sentence, y, hidden, beam_size)
+            probs, indices, hidden, a = predict(encoder, decoder, sentence, y,
+                                                hidden, beam_size)
 
             for k in range(len(indices[0])):
                 token = indices[0][k]
@@ -74,7 +72,8 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
                 # Only keep the best hypothesis per continuation
                 if ((token not in n_h) or
                    (token in n_h and new_prob > n_h[token][2])):
-                    n_h[token] = (token, summary + [token], new_prob, hidden, alphas + [a])
+                    n_h[token] = (token, summary + [token], new_prob, hidden,
+                                  alphas + [a])
 
         # Select top K hypotheses from new_hypotheses
         hypotheses = select_top(list(n_h.values()), beam_size)
@@ -88,10 +87,9 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
         hypotheses = tmp
 
     hypotheses.extend(final)
+
     # Indices to words
     summary, prob, _, alphas = select_top(hypotheses, 1, True)[0]
-    if M < 25:
-        print(alphas)
     summary = [i2w[w] for w in summary]
     return(summary)
 
@@ -134,12 +132,11 @@ if __name__ == "__main__":
     parser.add_argument('--rnn_decoder', type=str)
     parser.add_argument('--w2i', default='models/w2i.pickle', type=str)
     parser.add_argument('--i2w', default='models/i2w.pickle', type=str)
-    parser.add_argument('--verbose', type=bool, default=False)
     parser.add_argument('--nr_docs', type=int, default=10000)
     args = parser.parse_args()
-
     logging.basicConfig(level=logging.INFO)
 
+    # Load saved models
     w2i = pickle.load(open(args.w2i, 'rb'))
     w2i = {key: value for key, value in w2i}
     i2w = pickle.load(open(args.i2w, 'rb'))
@@ -164,27 +161,17 @@ if __name__ == "__main__":
     docs = []
     for i in range(nr_docs):
         doc = corpus.prepare(corpus.documents[i])
-        # if len(doc) < 20 and 'oil' in doc:
-        #     print(doc)
-        # else:
-        #     continue
         gold_summary = corpus.prepare(corpus.summaries[i])
         if args.decoder == "grd":
             summary = greedy(w2i, i2w, encoder, decoder, doc, args.length)
         else:
-            summary = beam_search(w2i, i2w, encoder, decoder, doc, args.length, args.beam_size)
-        if len(summary) < 20 and 'oil' in doc:
-            print(summary)
+            summary = beam_search(w2i, i2w, encoder, decoder, doc, args.length,
+                                  args.beam_size)
+
         predictions.append(" ".join(clean(summary)))
         gold.append(" ".join(clean(gold_summary)))
         docs.append(" ".join(doc))
         logging.info("Creating summary for doc {} / {}.".format(i+1, nr_docs))
-        # s.append("gold summary: " + " ".join(gold_summary) + "\n")
-        if args.verbose:
-            print(doc)
-            print("=", gold_summary)
-            print("<", summary)
-            print()
     open(args.save_summaries, 'w').write("\n".join(predictions))
     open("gold.txt", 'w').write("\n".join(gold))
     open("docs.txt", 'w').write("\n".join(docs))

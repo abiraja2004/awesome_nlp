@@ -8,7 +8,8 @@ import torch.nn.functional as F
 
 
 class Attentive_Encoder(nn.Module):
-
+    """Attentive encoder for the RNN encoder-decoder abstractive summarization
+    model."""
     def __init__(self, vocab_size, d, q, embed, enable_cuda=False):
         super(Attentive_Encoder, self).__init__()
         self.hidden_size = d
@@ -26,7 +27,7 @@ class Attentive_Encoder(nn.Module):
                                   requires_grad=True)
 
         # Use pretrained weights, a numpy matrix of shape vocab_dim x embed_dim
-        if False:
+        if embed is not None:
             self.embeddings.weight.data.copy_(torch.from_numpy(embed))
         self.q = q
         self.enable_cuda = enable_cuda
@@ -37,6 +38,8 @@ class Attentive_Encoder(nn.Module):
             y = y.unsqueeze(1)
         y = self.drop(y)
         batch_size, M = x.size()
+
+        # Encode the x positions
         if self.enable_cuda:
             x_pos = Variable(LongTensor([[i for i in range(M)]
                                          for j in range(batch_size)])).cuda()
