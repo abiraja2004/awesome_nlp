@@ -3,7 +3,6 @@
 #### Python3
 - pytorch
 - nltk
-- matplotlib
 
 #### Python2
 - [pke](https://github.com/boudinfl/pke)
@@ -41,6 +40,9 @@ In the folder 'model', a very small example model is provided, highly overfitted
 ```
 python main.py  --nr_docs 100 --batch_size 5 --lr 0.005 --epochs 5 --q 5 --documents <train.article.txt> --summaries <train.title.txt>
 ```
+
+Ensure that you have a 'models' folder when running this, relevant models will be saved there.
+
 #### Testing
 ```
 python test.py --decoder bms --encoder <enc.pt> --rnn_decoder <dec.pt> --w2i <w2i.pickle> --i2w <i2w.pickle> --nr_docs 10000 --save <summaries.txt> --documents <../dataset/test.article.txt> --summaries <../dataset/test.title.txt>
@@ -53,7 +55,7 @@ To use the greedy decoder, replace 'bms' with 'grd'.
 ```
 python main.py  --nr_docs 100 --batch_size 5 --lr 0.005 --epochs 5 --q 5 --documents <train.article.txt> --summaries <train.title.txt>
 ```
-
+Ensure that you have a 'models' folder when running this, relevant models will be saved there.
 
 #### Testing
 ```
