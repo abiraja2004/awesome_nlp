@@ -8,6 +8,8 @@ import pickle
 import torch.nn as nn
 from collections import defaultdict
 from torch.autograd import Variable
+from Decoder import RAN_Decoder
+from Encoder import Attentive_Encoder
 
 # Import objects and functions customized for the abstractive summarization
 
@@ -32,6 +34,7 @@ def greedy(w2i, i2w, encoder, decoder, sentence, max_length):
         enc, y = encoder(sentence, hidden, y)
         decoder_output, hidden = decoder(y, hidden, enc)
         topv, topi = decoder_output.data.topk(1)
+
         ni = topi[0][0]
         if ni == w2i["</s>"]:
             decoded_words.append('</s>')
@@ -40,21 +43,22 @@ def greedy(w2i, i2w, encoder, decoder, sentence, max_length):
             decoded_words.append(i2w[ni])
 
         y = Variable(torch.LongTensor([[ni]]))
+    decoder.cell.clear_m()
     return decoded_words
 
 
 def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
     """Given a sequence and a model, generate a summary according to
     beam search."""
-    M = len(sentence)
+
     # Initalize the summary with enough starting tags
     hidden = encoder.initHidden(1)
     y = [w2i["<s>"]]
     sentence = Variable(torch.LongTensor([[w2i[word] for word in sentence]]))
 
     # Initialize hypotheses with three most probable words after start tags
-    probs, indices, hidden, a = predict(encoder, decoder, sentence, y, hidden, beam_size)
-    hypotheses = [(y, y + [indices[0][i]], probs[0][i], hidden, [a])
+    probs, indices, hidden = predict(encoder, decoder, sentence, y, hidden, beam_size)
+    hypotheses = [(y, y + [indices[0][i]], probs[0][i], hidden)
                   for i in range(beam_size)]
     final = []
 
@@ -64,8 +68,8 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
         n_h = {}
         num_hypotheses = len(hypotheses)
         for j in range(num_hypotheses):
-            y, summary, prob, hidden, alphas = hypotheses[j]
-            probs, indices, hidden, a = predict(encoder, decoder, sentence, y, hidden, beam_size)
+            y, summary, prob, hidden = hypotheses[j]
+            probs, indices, hidden = predict(encoder, decoder, sentence, y, hidden, beam_size)
 
             for k in range(len(indices[0])):
                 token = indices[0][k]
@@ -74,7 +78,7 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
                 # Only keep the best hypothesis per continuation
                 if ((token not in n_h) or
                    (token in n_h and new_prob > n_h[token][2])):
-                    n_h[token] = (token, summary + [token], new_prob, hidden, alphas + [a])
+                    n_h[token] = (token, summary + [token], new_prob, hidden)
 
         # Select top K hypotheses from new_hypotheses
         hypotheses = select_top(list(n_h.values()), beam_size)
@@ -89,27 +93,26 @@ def beam_search(w2i, i2w, encoder, decoder, sentence, length, beam_size):
 
     hypotheses.extend(final)
     # Indices to words
-    summary, prob, _, alphas = select_top(hypotheses, 1, True)[0]
-    if M < 25:
-        print(alphas)
+    summary, prob, _ = select_top(hypotheses, 1, True)[0]
     summary = [i2w[w] for w in summary]
+    decoder.cell.clear_m()
     return(summary)
 
 
 def predict(encoder, decoder, sequence, y, hidden, beam_size):
     y = Variable(torch.LongTensor([y]))
-    enc, y, alphas = encoder(sequence, hidden, y)
+    enc, y = encoder(sequence, hidden, y)
     decoder_output, hidden = decoder(y, hidden, enc)
     prob, index = decoder_output.data.topk(beam_size)
-    return prob, index, hidden, alphas
+    return prob, index, hidden
 
 
 def select_top(hypotheses, K, final=False):
     # Select top K hypotheses with highest probs
     if final:
-        for i, (_, hypothesis, prob, hidden, a) in enumerate(hypotheses):
-            lp = (5 + len(hypothesis))**1 / (5 + 1)**1
-            hypotheses[i] = (hypothesis, prob / lp, hidden, a)
+        for i, (_, hypothesis, prob, hidden) in enumerate(hypotheses):
+            lp = (5 + len(hypothesis))**1.5 / (5 + 1)**1.5
+            hypotheses[i] = (hypothesis, prob / lp, hidden)
     return sorted(hypotheses, key=lambda x: x[1], reverse=True)[:K]
 
 
