@@ -132,7 +132,7 @@ if __name__ == "__main__":
     parser.add_argument('--summaries', type=str,
                         default='../sumdata/train/valid.title.txt')
     parser.add_argument('--encoder', type=str, help='Encoder torch pt file.')
-    parser.add_argument('--rnn_decoder', type=str, help='Decoder torch pt file.')
+    parser.add_argument('--ran_decoder', type=str, help='Decoder torch pt file.')
     parser.add_argument('--w2i', default='models/w2i.pickle', type=str)
     parser.add_argument('--i2w', default='models/i2w.pickle', type=str)
     parser.add_argument('--nr_docs', type=int, default=10000)
@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
     encoder = torch.load(args.encoder,
                          map_location=lambda storage, location: storage)
-    decoder = torch.load(args.rnn_decoder,
+    decoder = torch.load(args.ran_decoder,
                          map_location=lambda storage, location: storage)
     corpus = Gigaword_Collection(args.documents, args.summaries, args.nr_docs)
 
