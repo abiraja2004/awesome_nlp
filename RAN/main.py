@@ -1,7 +1,6 @@
 from __future__ import unicode_literals, print_function, division
 import os
 from train import trainIters
-from evaluate import evaluateRandomly
 from Decoder import RAN_Decoder
 from Encoder import Attentive_Encoder
 from data import Gigaword_Collection
@@ -142,6 +141,3 @@ if __name__ == "__main__":
 
     trainIters(batches, w2i, encoder, decoder, args.epochs, args.lr,
                args.length, args.ratio, enable_cuda)
-
-    evaluateRandomly(w2i, i2w, train, encoder, decoder, args.length,
-                     enable_cuda)
