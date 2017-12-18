@@ -1,4 +1,5 @@
 from __future__ import unicode_literals, print_function, division
+import os
 from random import random
 import time
 import logging
@@ -16,8 +17,8 @@ def trainIters(batches, w2i, encoder, decoder, epochs, learning_rate,
                max_length, teacher_forcing_ratio, enable_cuda=False):
     start = time.time()
     plot_losses = []
-    enc_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
-    dec_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
+    enc_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate, weight_decay=1e-06)
+    dec_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate, weight_decay=1e-06)
     criterion = nn.NLLLoss()
 
     for i in range(epochs):
@@ -35,11 +36,14 @@ def trainIters(batches, w2i, encoder, decoder, epochs, learning_rate,
                              dec_optimizer, criterion, max_length, w2i,
                              teacher_forcing_ratio, enable_cuda)
             total_loss += loss
+            if j % 3000 == 0:
+                torch.save(encoder, os.path.dirname(os.path.realpath(__file__)) + "/models/epoch{}_batch{}_enc.pt".format(i, j))
+                torch.save(decoder, os.path.dirname(os.path.realpath(__file__)) + "/models/epoch{}_batch{}_dec.pt".format(i, j))
             logging.info("Epoch {}, batch {}/{}, average loss {}".format(
                 i+1, j+1, n, total_loss/(j+1))
             )
-        torch.save(encoder, "models/epoch{}_enc.pt".format(i))
-        torch.save(decoder, "models/epoch{}_dec.pt".format(i))
+        torch.save(encoder, os.path.dirname(os.path.realpath(__file__)) + "/models/epoch{}_enc.pt".format(i))
+        torch.save(decoder, os.path.dirname(os.path.realpath(__file__)) + "/models/epoch{}_dec.pt".format(i))
         plot_losses.append(total_loss)
 
     end = time.time()

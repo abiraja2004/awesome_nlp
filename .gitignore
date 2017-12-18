@@ -8,3 +8,5 @@ glove.6B/
 nplm_model.pt
 summaries.txt
 generated_summaries/
+baselines/tmp.txt
+tmp.txt
